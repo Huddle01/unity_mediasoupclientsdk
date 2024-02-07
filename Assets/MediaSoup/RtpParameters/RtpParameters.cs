@@ -9,6 +9,7 @@ using Newtonsoft.Json.Converters;
 
 namespace Mediasoup.RtpParameter
 {
+    
     [Serializable]
     public class RtpParameters
     {
@@ -17,7 +18,6 @@ namespace Mediasoup.RtpParameter
         public List<RtpHeaderExtensionParameters> headerExtensions = new List<RtpHeaderExtensionParameters>();
         public List<RtpEncodingParameters> encodings = new List<RtpEncodingParameters>();
         public RtcpParameters RtcpParameters;
-
     }
 
     [Serializable]

@@ -6,6 +6,7 @@ namespace Mediasoup.Internal
     public interface IEnhancedEventEmitter
     {
         Task<bool> SafeEmit(string name, params object[]? args);
+        Task<bool> SafeEmit(string name, Action callback, Action<string> errorCallback, params object[]? args);
     }
 
     public interface IEnhancedEventEmitter<TEvent> : IEnhancedEventEmitter { }
@@ -27,6 +28,22 @@ namespace Mediasoup.Internal
             }
             catch (Exception e)
             {
+                return numListeners > 0;
+            }
+        }
+
+        public async Task<bool> SafeEmit(string name, Action callback, Action<string> errorCallback, params object[]? args)
+        {
+            var numListeners = ListenerCount(name);
+            try
+            {
+                await Emit(name, args);
+                callback?.Invoke();
+                return true;
+            }
+            catch (Exception e)
+            {
+                errorCallback?.Invoke(e.Message);
                 return numListeners > 0;
             }
         }

@@ -5,151 +5,155 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Mediasoup.Internal;
 using System;
+using System.Threading.Tasks;
+using Unity.WebRTC;
 
-namespace Mediasoup 
+namespace Mediasoup
 {
     public interface IConsumer
     {
-        string Id { get; }
-        bool Closed { get; }
+        string id { get; set; }
+        string localId { get; set; }
+        string producerId { get; set; }
+        bool isClosed { get; set; }
+        MediaKind kind { get; set; }
+        RTCRtpReceiver rtpReceiver { get; set; }
+        MediaStreamTrack track { get; set; }
+        RtpParameters rtpParameters { get; set; }
+        bool isPaused { get; set; }
 
-        bool Paused { get; }
-
-        bool ProducerPaused { get; }
-
-        MediaKind Kind { get; }
-
-        RtpParameter.RtpParameters RtpParameters { get; }
-
-        ConsumerType Type { get; }
+        object appData { get; set; }
 
         void Close();
-
+        RTCStatsReport GetStats();
+        void Pause();
+        void Resume();
         void TransportClosed();
+        void OnTrackEnded();
+        void HandleTrack();
+        void DestroyTrack();
 
-        internal EnhancedEventEmitter Observer { get; }
+        EnhancedEventEmitter observer { get; set; }
+
     }
 
     public class Consumer<TConsumerAppData> : EnhancedEventEmitter<ConsumerEvents>, IConsumer
     {
+        public object appData { get; set; }
+        public string id { get; set; }
+        public string localId { get; set; }
+        public string producerId { get; set; }
+        public bool isClosed { get; set; }
+        public MediaKind kind { get; set; }
+        public RTCRtpReceiver rtpReceiver { get; set; }
+        public MediaStreamTrack track { get; set; }
+        public RtpParameters rtpParameters { get; set; }
+        public bool isPaused { get; set; }
 
-        public object AppData { get; protected set; }
 
-        public Consumer(TConsumerAppData? appData) : base()
+        public EnhancedEventEmitter observer { get; set; }
+
+        public Consumer(string _id,string _localId, string _producerId, RTCRtpReceiver _rtpReceiver,
+                            MediaStreamTrack _track, RtpParameters _rtpParameters, TConsumerAppData? _appData) : base()
         {
-            if(appData!=null) AppData = appData;
+            id = _id;
+            localId = _localId;
+            producerId = _producerId;
+            rtpReceiver = _rtpReceiver;
+            track = _track;
+            rtpParameters = _rtpParameters;
+
+            if (_appData != null) appData = _appData ?? typeof(TConsumerAppData).New<TConsumerAppData>()!;
         }
 
-        public string Id => throw new NotImplementedException();
 
-        public bool Closed => throw new NotImplementedException();
+        public delegate void OnGetStatsHandler(RTCStatsReport report);
+        public event OnGetStatsHandler OnGetStats;
 
-        public bool Paused => throw new NotImplementedException();
+        public RTCStatsReport GetStats()
+        {
+            if (isClosed) 
+            {
+                throw new InvalidOperationException("closed");
+            }
 
-        public bool ProducerPaused => throw new NotImplementedException();
+            RTCStatsReportAsyncOperation a =  rtpReceiver.GetStats();
+            return a.Value;
+        }
 
-        public MediaKind Kind => throw new NotImplementedException();
+        
 
-        public RtpParameters RtpParameters => throw new NotImplementedException();
+        public void Pause()
+        {
+            if (isClosed) return;
+            if (isPaused) return;
 
-        public ConsumerType Type => throw new NotImplementedException();
+            isPaused = true;
+            track.Enabled = false;
 
-        string IConsumer.Id => throw new NotImplementedException();
+            Emit("@pause");
+            observer.SafeEmit("pause");
+        }
 
-        bool IConsumer.Closed => throw new NotImplementedException();
-
-        bool IConsumer.Paused => throw new NotImplementedException();
-
-        bool IConsumer.ProducerPaused => throw new NotImplementedException();
-
-        MediaKind IConsumer.Kind => throw new NotImplementedException();
-
-        RtpParameters IConsumer.RtpParameters => throw new NotImplementedException();
-
-        ConsumerType IConsumer.Type => throw new NotImplementedException();
-
-        EnhancedEventEmitter IConsumer.Observer => throw new NotImplementedException();
-
-        public void Close()
+        public void Resume()
         {
             throw new NotImplementedException();
         }
 
         public void TransportClosed()
         {
-            throw new NotImplementedException();
+            if (isClosed) return;
+            isClosed = true; 
+            DestroyTrack();
+            Emit("transportclose");
+            observer.SafeEmit("close");
         }
 
-        void IConsumer.Close()
+        public void HandleTrack()
         {
             throw new NotImplementedException();
         }
 
-        void IConsumer.TransportClosed()
+        public void DestroyTrack()
         {
             throw new NotImplementedException();
         }
+
+        public void Close()
+        {
+            if (isClosed) return;
+
+            isClosed = true;
+            DestroyTrack();
+            Emit("@close");
+            observer.SafeEmit("close");
+        }
+
+        public void OnTrackEnded()
+        {
+            throw new NotImplementedException();
+        }
+        
     }
 
 
 
-    public record ConsumerEvents
+    public class ConsumerEvents
     {
-        public List<object> Transportclose { get; set; } = new();
-        public List<object> Producerclose { get; set; } = new();
-        public List<object> Producerpause { get; set; } = new();
-        public List<object> Producerresume { get; set; } = new();
-        public Tuple<ConsumerScore> Score { get; set; }
-        public Tuple<ConsumerLayers?> Layerschange { get; set; }
-        public Tuple<ConsumerTraceEventData> Trace { get; set; }
-        public Tuple<byte[]> Rtp { get; set; }
+        public List<Action> transportclose { get; set; } = new List<Action>();
+        public List<Action> trackended { get; set; } = new List<Action>();
 
-        private List<object> close = new();
-        private List<object> producerclose = new();
-
+        public List<Action<RTCStatsReport>> OnGetStats { get; set; } = new List<Action<RTCStatsReport>>();
+        public List<Action> OnClose { get; set; } = new List<Action>();
+        public List<Action> OnPause { get; set; } = new List<Action>();
+        public List<Action> OnResume { get; set; } = new List<Action>();
     }
 
-    public record ConsumerScore
+    public class ConsumerOptions
     {
        
-        public int Score { get; set; }
-
-        
-        public int ProducerScore { get; set; }
-
-        
-        public List<object> ProducerScores { get; set; } = new();
     }
 
-    public record ConsumerLayers
-    {
-        
-        public int SpatialLayer { get; set; }
-
-        
-        public int? TemporalLayer { get; set; }
-    }
-
-    public record ConsumerTraceEventData
-    {
-        public ConsumerTraceEventType Type { get; set; }
-
-        public long Timestamp;
-
-        public string Direction { get; set; }
-
-        public object Info { get; set; }
-    }
-
-    public record ConsumerObserverEvents
-    {
-        public List<object> Close { get; set; } = new();
-        public List<object> Pause { get; set; } = new();
-        public List<object> Resume { get; set; } = new();
-        public Tuple<ConsumerScore> Score { get; set; }
-        public Tuple<ConsumerLayers?> Layerschange { get; set; }
-        public Tuple<ConsumerTraceEventData> Trace { get; set; }
-    }
 
     [JsonConverter(typeof(StringEnumConverter))]
     public enum ConsumerTraceEventType
