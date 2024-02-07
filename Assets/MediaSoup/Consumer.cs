@@ -1,11 +1,7 @@
-using System.Collections;
 using System.Collections.Generic;
 using Mediasoup.RtpParameter;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 using Mediasoup.Internal;
 using System;
-using System.Threading.Tasks;
 using Unity.WebRTC;
 
 namespace Mediasoup
@@ -22,16 +18,11 @@ namespace Mediasoup
         RtpParameters rtpParameters { get; set; }
         bool isPaused { get; set; }
 
-        object appData { get; set; }
-
         void Close();
         RTCStatsReport GetStats();
         void Pause();
         void Resume();
         void TransportClosed();
-        void OnTrackEnded();
-        void HandleTrack();
-        void DestroyTrack();
 
         EnhancedEventEmitter observer { get; set; }
 
@@ -39,7 +30,7 @@ namespace Mediasoup
 
     public class Consumer<TConsumerAppData> : EnhancedEventEmitter<ConsumerEvents>, IConsumer
     {
-        public object appData { get; set; }
+        public object appData { get; private set; }
         public string id { get; set; }
         public string localId { get; set; }
         public string producerId { get; set; }
@@ -66,57 +57,9 @@ namespace Mediasoup
             if (_appData != null) appData = _appData ?? typeof(TConsumerAppData).New<TConsumerAppData>()!;
         }
 
-
-        public delegate void OnGetStatsHandler(RTCStatsReport report);
-        public event OnGetStatsHandler OnGetStats;
-
-        public RTCStatsReport GetStats()
+        ~Consumer() 
         {
-            if (isClosed) 
-            {
-                throw new InvalidOperationException("closed");
-            }
-
-            RTCStatsReportAsyncOperation a =  rtpReceiver.GetStats();
-            return a.Value;
-        }
-
-        
-
-        public void Pause()
-        {
-            if (isClosed) return;
-            if (isPaused) return;
-
-            isPaused = true;
-            track.Enabled = false;
-
-            Emit("@pause");
-            observer.SafeEmit("pause");
-        }
-
-        public void Resume()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void TransportClosed()
-        {
-            if (isClosed) return;
-            isClosed = true; 
-            DestroyTrack();
-            Emit("transportclose");
-            observer.SafeEmit("close");
-        }
-
-        public void HandleTrack()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void DestroyTrack()
-        {
-            throw new NotImplementedException();
+            
         }
 
         public void Close()
@@ -129,13 +72,69 @@ namespace Mediasoup
             observer.SafeEmit("close");
         }
 
-        public void OnTrackEnded()
+        public void TransportClosed()
         {
-            throw new NotImplementedException();
+            if (isClosed) return;
+            isClosed = true;
+            DestroyTrack();
+            _ = Emit("transportclose");
+            _ = observer.SafeEmit("close");
         }
-        
-    }
 
+        public RTCStatsReport GetStats()
+        {
+            if (isClosed)
+            {
+                throw new InvalidOperationException("closed");
+            }
+
+            RTCStatsReportAsyncOperation a = rtpReceiver.GetStats();
+            return a.Value;
+        }
+
+        public void Pause()
+        {
+            if (isClosed) return;
+            if (isPaused) return;
+
+            isPaused = true;
+            track.Enabled = false;
+
+            _ = Emit("@pause");
+            _ = observer.SafeEmit("pause");
+        }
+
+        public void Resume()
+        {
+            if (isClosed) return;
+            if (!isPaused) return;//already playing
+
+            isPaused = false;
+            track.Enabled = true;
+
+            _ = Emit("@resume");
+            _ = observer.SafeEmit("resume");
+
+        }
+
+        private void OnTrackEnded()
+        {
+            _ = Emit("trackended");
+            _ = observer.SafeEmit("trackended");
+        }
+
+        private void HandleTrack()
+        {
+            
+        }
+
+        private void DestroyTrack()
+        {
+            track.Stop();
+            OnTrackEnded();
+        }
+
+    }
 
 
     public class ConsumerEvents
@@ -147,33 +146,18 @@ namespace Mediasoup
         public List<Action> OnClose { get; set; } = new List<Action>();
         public List<Action> OnPause { get; set; } = new List<Action>();
         public List<Action> OnResume { get; set; } = new List<Action>();
+
+        public string Close = "close";
     }
 
-    public class ConsumerOptions
+    public class ConsumerOptions<TConsumerAppData>
     {
-       
-    }
-
-
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum ConsumerTraceEventType
-    {
-        rtp,
-        keyframe,
-        nack,
-        pli,
-        fir
-    }
-
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum ConsumerType
-    {
-        simple = 1,
-        simulcast = 2,
-        svc = 3,
-        pipe
+        public string id;
+        public string producerId;
+        public string kind;  //'audio' | 'video'
+        public RtpParameters rtpParameters;
+        public string streamId;
+        public TConsumerAppData appData;
     }
 
 }
-
-
