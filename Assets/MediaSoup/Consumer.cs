@@ -55,6 +55,8 @@ namespace Mediasoup
             rtpParameters = _rtpParameters;
 
             if (_appData != null) appData = _appData ?? typeof(TConsumerAppData).New<TConsumerAppData>()!;
+
+            observer = new EnhancedEventEmitter<ConsumerObserverEvents>();
         }
 
         ~Consumer() 
@@ -158,6 +160,14 @@ namespace Mediasoup
         public RtpParameters rtpParameters;
         public string streamId;
         public TConsumerAppData appData;
+    }
+
+    public class ConsumerObserverEvents 
+    {
+        public List<Action> OnClose { get; set; } = new List<Action>();
+        public List<Action> OnPause { get; set; } = new List<Action>();
+        public List<Action> OnResume { get; set; } = new List<Action>();
+        public List<Action> OnTrackEnded { get; set; } = new List<Action>();
     }
 
 }
