@@ -13,8 +13,6 @@ namespace Mediasoup.Transports
 {
     public class Transport
     {
-        Action onClose;
-
 
     }
 

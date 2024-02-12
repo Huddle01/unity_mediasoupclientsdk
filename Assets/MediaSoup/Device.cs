@@ -33,7 +33,7 @@ namespace Mediasoup
             return null;
         }
 
-        public void Load(string routerRtpCapabilities,PeerConnection.Options peerConnectionOptions) 
+        public void Load(string routerRtpCapabilities,RTCConfiguration peerConnectionOptions) 
         {
             
         }

@@ -70,8 +70,8 @@ namespace Mediasoup
 
             isClosed = true;
             DestroyTrack();
-            Emit("@close");
-            observer.SafeEmit("close");
+            _ = Emit("@close");
+            _ = observer.SafeEmit("close");
         }
 
         public void TransportClosed()
