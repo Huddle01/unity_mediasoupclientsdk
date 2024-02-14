@@ -8,6 +8,9 @@ namespace Mediasoup.SctpParameter
     public class SctpParameters
     {
         public int port;
+        public int os;
+        public int mis;
+        public int maxMessageSize;
     }
 
     [Serializable]

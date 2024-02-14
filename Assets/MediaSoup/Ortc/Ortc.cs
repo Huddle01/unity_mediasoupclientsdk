@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Dynamic;
 
-namespace Mediasoup 
+namespace Mediasoup.Ortc 
 {
     public class Ortc
     {

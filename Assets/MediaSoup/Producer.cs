@@ -8,7 +8,7 @@ using Mediasoup.Internal;
 
 namespace Mediasoup
 {
-    interface IProducer
+    public interface IProducer
     {
         string id { get;}
         string localId { get;}
@@ -86,7 +86,6 @@ namespace Mediasoup
         private void HandleTrack()
         {
             
-
         }
 
         private void DestroyTrack()
@@ -205,8 +204,6 @@ namespace Mediasoup
                     track.Enabled = false;
                 }
             }
-
-
         }
 
         public void SetMaxSpatialLayer(int layer)
@@ -256,7 +253,6 @@ namespace Mediasoup
             }
 
             _ = rtpSender.SetParameters(sendParam);
-
         }
     }
 
