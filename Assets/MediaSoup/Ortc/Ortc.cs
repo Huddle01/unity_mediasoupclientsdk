@@ -75,8 +75,8 @@ namespace Mediasoup.Ortc
             }
 
             // parameters is optional. If unset, set it to an empty object.
-
-            codec.parameters ??= new ExpandoObject();
+            if (codec.parameters == null)
+                codec.parameters = new Dictionary<string, object>();
 
             foreach (var (key, val) in codec.parameters)
             {
