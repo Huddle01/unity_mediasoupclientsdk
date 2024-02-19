@@ -17,9 +17,6 @@ namespace Mediasoup.SctpParameter
     public class SctpCapabilities 
     {
         public NumSctpStreams numStreams;
-        public int OS;
-        public int MIS;
-        public int maxMessageSize;
     }
 
     [Serializable]

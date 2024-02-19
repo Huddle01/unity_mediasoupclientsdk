@@ -13,6 +13,7 @@ using Mediasoup.Ortc;
 using Mediasoup;
 using System.Threading.Tasks;
 using Mediasoup.Types;
+using Newtonsoft.Json.Converters;
 
 /// <summary>
 /// 
@@ -28,7 +29,7 @@ namespace Mediasoup.Transports
         object extendedRtpCapabilities { get; }
         CanProduceByKind canProduceKind { get; }
         int maxSctpMessageSize { get; }
-        IHandlerInterface handlerInterface { get; }
+        HandlerInterface handlerInterface { get; }
         RTCIceGatheringState iceGatheringState { get; }
         RTCIceConnectionState connectionState { get; }
         object appData { get; }
@@ -88,7 +89,7 @@ namespace Mediasoup.Transports
 
         public int maxSctpMessageSize { get; private set; }
 
-        public IHandlerInterface handlerInterface { get; private set; }
+        public HandlerInterface handlerInterface { get; private set; }
 
         public RTCIceGatheringState iceGatheringState { get; private set; }
 
@@ -145,7 +146,7 @@ namespace Mediasoup.Transports
             //delete additionalSettings.rtcpMuxPolicy;
             //delete additionalSettings.sdpSemantics;
 
-            handlerInterface = new HandlerInterface();
+            handlerInterface = new HandlerInterface("Unity");
 
             HandlerRunOptions handlerRunOptions = new HandlerRunOptions();
             handlerRunOptions.direction = _direction;
@@ -343,7 +344,7 @@ namespace Mediasoup.Transports
     public class DtlsParameters 
     {
         public DtlsRole role;
-        public DtlsFingerprint[] fingerprints;
+        public List<DtlsFingerprint> fingerprints = new List<DtlsFingerprint>();
     }
 
     public enum DtlsRole 
@@ -353,13 +354,19 @@ namespace Mediasoup.Transports
         server
     }
 
+    [JsonConverter(typeof(StringEnumConverter))]
     public enum FingerPrintAlgorithm
     {
+        [StringValue("sha-1")]
         sha1,
-	    sha224,
-	    sha256,
-	    sha384,
-	    sha512
+        [StringValue("sha-224")]
+        sha224,
+        [StringValue("sha-256")]
+        sha256,
+        [StringValue("sha-384")]
+        sha384,
+        [StringValue("sha-512")]
+        sha512
     }
 
     /*
@@ -372,6 +379,7 @@ namespace Mediasoup.Transports
 
 
     [Serializable]
+    
     public class DtlsFingerprint 
     {
         public FingerPrintAlgorithm algorithm;

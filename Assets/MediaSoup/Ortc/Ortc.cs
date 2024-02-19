@@ -9,6 +9,7 @@ using System;
 using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Dynamic;
+using System.Linq;
 
 namespace Mediasoup.Ortc 
 {
@@ -498,5 +499,27 @@ namespace Mediasoup.Ortc
         }
 
 
+    }
+
+    public static class OrtcUtils 
+    {
+        public static void AddNackSuppportForOpus(RtpCapabilities rtpCapabilities) 
+        {
+            foreach (var codec in rtpCapabilities.codecs) 
+            {
+                if ((codec.mimeType.ToLower() == "audio/opus" || codec.mimeType.ToLower() == "audio/multiopus") && 
+                    (codec.rtcpFeedback?.Any(fb => fb.type == "nack" && fb.parameters == null) == true)) 
+                {
+                    if (codec.rtcpFeedback!=null) 
+                    {
+                        codec.rtcpFeedback = new List<RtcpFeedback>();
+                    }
+
+
+                    RtcpFeedback nackSupp = new RtcpFeedback {type = "nack",parameters =  "" };
+                    codec.rtcpFeedback.Add(nackSupp);
+                }
+            }
+        }
     }
 }

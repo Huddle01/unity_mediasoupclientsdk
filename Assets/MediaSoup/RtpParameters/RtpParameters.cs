@@ -35,7 +35,7 @@ namespace Mediasoup.RtpParameter
         public int preferredPayloadType;
         public int clockRate;
         public int channels;
-        public IDictionary<string, object> parameters;
+        public Dictionary<string, object> parameters = new Dictionary<string, object>();
         public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
     }
 
