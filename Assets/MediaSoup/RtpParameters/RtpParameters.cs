@@ -145,7 +145,8 @@ namespace Mediasoup.RtpParameter
     public enum MediaKind
     {
         audio,
-        video
+        video,
+        application
     }
 
     [JsonConverter(typeof(StringEnumConverter))]
