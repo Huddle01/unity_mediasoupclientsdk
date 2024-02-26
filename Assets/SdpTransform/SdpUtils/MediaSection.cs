@@ -11,6 +11,7 @@ using Mediasoup;
 using Unity.WebRTC;
 using System.Linq;
 using System.Text.RegularExpressions;
+using UtilmeSdpTransform;
 
 public class MediaSection
 {
@@ -449,16 +450,89 @@ public class AnswerMediaSection  : MediaSection
 
                                 }
 
+                            }
+
+                        }
+
+                        //_mediaObject.payloads = answerRtpParameters!.codecs
+                        //.map((codec: RtpCodecParameters) => codec.payloadType)
+                        //.join(' ');
+
+                        _mediaObject.Attributes.Extmaps = new List<Extmap>();
+
+                        if (_answerRtp!=null && _answerRtp.headerExtensions!=null) 
+                        {
+                            foreach (var ext in _answerRtp.headerExtensions)
+                            {
+                                // Don't add a header extension if not present in the offer.
+                                bool found = (tempMediaDes.Attributes.Extmaps.Any(localExt => localExt.Uri.AbsoluteUri == ext.uri));
+
+                                if (!found)
+                                {
+                                    continue;
+                                }
+
+                                _mediaObject.Attributes.Extmaps.Add(new Extmap
+                                {
+                                    Uri = new Uri(ext.uri) ,
+                                    Value = ext.id
+                                });
+                            }
+                        }
+
+                        // Simulcast.
+                        if (tempMediaDes.Attributes.Simulcast != null)
+                        {
+                            _mediaObject.Attributes.Simulcast = new Simulcast
+                            {
+                                Direction = RidDirection.Recv,
+                                IdList = tempMediaDes.Attributes.Simulcast.IdList
+                            };
+
+                            _mediaObject.Attributes.Rids = new List<Rid>();
+
+                            foreach (Rid rid in tempMediaDes.Attributes.Rids)
+                            {
+                                if (rid.Direction != RidDirection.Send)
+                                    continue;
+
+                                _mediaObject.Attributes.Rids.Add(new Rid
+                                {
+                                    Id = rid.Id,
+                                    Direction = RidDirection.Recv,
+                                });
 
 
                             }
 
-                            
-
                         }
+                        else 
+                        {
+                            Debug.Log("Implement Simulcast03"); // currently dont know what it is
+                        }
+
+                        if (_planB && _mediaObject.Media == MediaType.Video) 
+                        {
+                            //_mediaObject.xGoogleFlag = 'conference';
+                        }
+
+
+                    }
+
+                    break;
+
+                case MediaType.Application:
+                    if (tempMediaDes.Attributes.SctpPort!=null)
+                    {
+                        //_mediaObject.payloads = 'webrtc-datachannel';
+                        if (_sctpParameters != null) 
+                        {
+                            _mediaObject.Attributes.SctpPort.Port = _sctpParameters.port;
+                            _mediaObject.Attributes.MaxMessageSize.Size = _sctpParameters.maxMessageSize;
+                        } 
+
                     }
                     
-
                     break;
             }
 
@@ -475,8 +549,59 @@ public class AnswerMediaSection  : MediaSection
 
     public void MuxSimulcastStreams(List<RTCRtpEncodingParameters> encodings)
     {
-        throw new NotImplementedException();
+        if (_mediaObject.Attributes.Simulcast == null || _mediaObject.Attributes.Simulcast.IdList == null) return;
+
+        Dictionary<string, RTCRtpEncodingParameters> layers = new Dictionary<string, RTCRtpEncodingParameters>();
+
+        foreach (var encoding in encodings)
+        {
+            if (!string.IsNullOrEmpty(encoding.rid))
+            {
+                layers[encoding.rid] = encoding;
+            }
+        }
+
+        string raw =  string.Join(";",_mediaObject.Attributes.Simulcast.IdList);
+        List<List<SimulcastFormat>> simulcastStreams = UtilityExtensions.ParseSimulcastStreamList(raw);
+
+        foreach (var simulcastStream in simulcastStreams)
+        {
+            foreach (var simulcastFormat in simulcastStream)
+            {
+                simulcastFormat.Paused = !layers.TryGetValue(simulcastFormat.Scid.ToString(), out var layer) || !layer.active;
+            }
+        }
+
+        _mediaObject.Attributes.Simulcast.IdList = simulcastStreams.Select(simulcastFormats =>
+                string.Join(",", simulcastFormats.Select(f => $"{(f.Paused ? "~" : "")}{f.Scid}")))
+            .ToArray();
+
     }
+
+    public override void Resume() 
+    {
+        _mediaObject.Direction = "recvonly";
+    }
+
+    public override void SetDtlsRole(DtlsRole _dtlsRole)
+    {
+        switch (_dtlsRole) 
+        {
+            case DtlsRole.client:
+                _mediaObject.Attributes.Setup = new Setup {Role = SetupRole.Active };
+                break;
+
+            case DtlsRole.server:
+                _mediaObject.Attributes.Setup = new Setup { Role = SetupRole.Active };
+                break;
+
+            case DtlsRole.auto:
+                _mediaObject.Attributes.Setup = new Setup { Role = SetupRole.Active };
+                break;
+        }
+    }
+
+
 
 
 }
