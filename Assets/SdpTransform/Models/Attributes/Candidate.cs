@@ -38,6 +38,8 @@ namespace Utilme.SdpTransform
         // Optional extensions, name value pairs separated with space.
         public (string, string)[] Extensions { get; set; }
 
+        public string TCPType { get; set; }
+
 
     }
 }

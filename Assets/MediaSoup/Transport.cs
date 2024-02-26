@@ -334,6 +334,7 @@ namespace Mediasoup.Transports
         public string foundation;
         public int priority;
         public string ip;
+        public string address;
         public string protocol; //"udp" || "tcp"
         public int port;
         public string type;//'host' | 'srflx' | 'prflx' | 'relay'

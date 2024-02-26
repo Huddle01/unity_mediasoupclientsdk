@@ -296,15 +296,15 @@ namespace Mediasoup
 
     public class ProducerCodecOptions 
     {
-        public bool opusStereo;
-        public bool opusFec;
-        public bool opusDtx;
-        public int opusMaxPlaybackRate;
-        public int opusMaxAverageBitrate;
-        public int opusPtime;
-        public bool opusNack;
-        public int videoGoogleStartBitrate;
-        public int videoGoogleMaxBitrate;
-        public int videoGoogleMinBitrate;
+        public bool? opusStereo;
+        public bool? opusFec;
+        public bool? opusDtx;
+        public int? opusMaxPlaybackRate;
+        public int? opusMaxAverageBitrate;
+        public int? opusPtime;
+        public bool? opusNack;
+        public int? videoGoogleStartBitrate;
+        public int? videoGoogleMaxBitrate;
+        public int? videoGoogleMinBitrate;
     }
 }

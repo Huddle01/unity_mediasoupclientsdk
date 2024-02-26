@@ -46,6 +46,8 @@ namespace Utilme.SdpTransform
         // Attributes.
         public Attributes Attributes { get; set; }
 
+        public string Direction { get; set; }
+
 
 
         ////public byte[] Title { get; set; }
