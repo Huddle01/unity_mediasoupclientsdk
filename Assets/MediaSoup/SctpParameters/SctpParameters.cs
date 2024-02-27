@@ -17,6 +17,11 @@ namespace Mediasoup.SctpParameter
     public class SctpCapabilities 
     {
         public NumSctpStreams numStreams;
+
+        public SctpCapabilities() 
+        {
+            numStreams = new NumSctpStreams();
+        }
     }
 
     [Serializable]

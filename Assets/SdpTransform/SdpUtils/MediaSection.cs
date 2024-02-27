@@ -613,11 +613,255 @@ public class OfferMediaSection : MediaSection
                               MediaKind _mediaKind, RtpParameters _offerRtp,string _streamId, string _trackId,bool _oldDataChannelSpec = false) :
                                 base(_iceParameters, _iceCandidates, _dtlsParameters, _planB)
     {
+        _mediaObject.Attributes.Mid.Id = _mid;
+
+        switch (_mediaKind) 
+        {
+            case MediaKind.audio:
+                _mediaObject.Media = MediaType.Audio;
+                break;
+
+            case MediaKind.video:
+                _mediaObject.Media = MediaType.Video;
+                break;
+
+            case MediaKind.application:
+                _mediaObject.Media = MediaType.Application;
+                break;
+        }
+
+        if (_plainRtpParameters == null)
+        {
+            _mediaObject.ConnectionData = new ConnectionData
+            {
+                ConnectionAddress = "127.0.0.1",
+                AddrType = AddrType.Ip4
+            };
+
+            if (_sctpParameters == null)
+            {
+                _mediaObject.Proto = "UDP/TLS/RTP/SAVPF";
+            }
+            else
+            {
+                _mediaObject.Proto = "UDP/DTLS/SCTP";
+            }
+        }
+        else 
+        {
+            AddrType tempAdr = _plainRtpParameters.ipVersion.Contains("4") ? AddrType.Ip4 : AddrType.Ip6;
+            _mediaObject.ConnectionData = new ConnectionData
+            {
+                ConnectionAddress = _plainRtpParameters.ip,
+                AddrType = tempAdr
+            };
+
+            _mediaObject.Proto = "RTP/AVP";
+            _mediaObject.Port = _plainRtpParameters.port;
+        }
+
+        switch (_mediaKind) 
+        {
+            case MediaKind.audio:
+            case MediaKind.video:
+                _mediaObject.Direction = "sendonly";
+                _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
+                _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
+                _mediaObject.Attributes.Fmtps = new List<Fmtp>();
+
+                if (!_planB) 
+                {
+                    _mediaObject.Attributes.Msid = new Msid 
+                    {
+                        AppData = _streamId,
+                        Id = _trackId
+                    };
+
+
+                }
+
+                if (_offerRtp!=null) 
+                {
+                    foreach (var codec in _offerRtp.codecs)
+                    {
+                        Rtpmap rtp = new Rtpmap
+                        {
+                            PayloadType = codec.payloadType,
+                            EncodingName = GetCodecName(codec),
+                            ClockRate = codec.clockRate
+                        };
+
+                        if (codec.channels > 1)
+                        {
+                            rtp.Channels = codec.channels;
+                        }
+
+                        _mediaObject.Attributes.Rtpmaps.Add(rtp);
+
+                        Fmtp fmtp = new Fmtp 
+                        {
+                            PayloadType = codec.payloadType,
+                            Value = "",
+                        };
+
+                        StringBuilder configBuilder = new System.Text.StringBuilder();
+
+
+                        foreach (var keyV in codec.parameters)
+                        {
+                            if (configBuilder.Length > 0)
+                            {
+                                configBuilder.Append(';');
+                            }
+
+                            configBuilder.Append($"{keyV.Key}={codec.parameters[keyV.Key]}");
+                        }
+
+                        fmtp.Value = configBuilder.ToString();
+
+                        if (string.IsNullOrEmpty(fmtp.Value)) 
+                        {
+                            _mediaObject.Attributes.Fmtps.Add(fmtp);
+                        }
+
+                        foreach (var fb in codec.rtcpFeedback)
+                        {
+                            _mediaObject.Attributes.RtcpFbs.Add(new RtcpFb 
+                            {
+                                PayloadType = codec.payloadType,
+                                Type = fb.type,
+                                SubType = fb.parameters
+                            });
+                        }
+
+
+
+                    }
+                }
+
+                //this._mediaObject.payloads = offerRtpParameters!.codecs
+                //  .map((codec: RtpCodecParameters) => codec.payloadType)
+                //.join(' ');
+
+                _mediaObject.Attributes.Extmaps = new List<Extmap>();
+
+                if (_offerRtp!=null && _offerRtp.headerExtensions != null) 
+                {
+                    foreach (var ext in _offerRtp.headerExtensions)
+                    {
+                        _mediaObject.Attributes.Extmaps.Add(new Extmap 
+                        {
+                            Uri = new Uri(ext.uri),
+                            Value = ext.id
+                        });
+                    }
+                }
+
+
+                //Done by default
+                //_mediaObject.rtcpMux = 'rtcp-mux';
+                //_mediaObject.rtcpRsize = 'rtcp-rsize';
+
+                if (_offerRtp != null && _offerRtp.encodings != null && _offerRtp.encodings.Count > 0) 
+                {
+                    RtpEncodingParameters encoding = _offerRtp.encodings[0];
+                    int ssrc = encoding.ssrc;
+                    RtpEncodingParameters.RtxParameters rtsxSSrc =null;
+                    if (encoding.rtx!=null) 
+                    {
+                        rtsxSSrc = encoding.rtx;
+                    }
+
+                    _mediaObject.Attributes.Ssrcs = new List<Ssrc>();
+                    _mediaObject.Attributes.SsrcGroups = new List<SsrcGroup>();
+
+                    if (_offerRtp.RtcpParameters!=null && !string.IsNullOrEmpty(_offerRtp.RtcpParameters.cname)) 
+                    {
+                        _mediaObject.Attributes.Ssrcs.Add(new Ssrc 
+                        {
+                            Id = (uint)ssrc,
+                            Attribute = "cname",
+                            Value = _offerRtp.RtcpParameters.cname
+                        });
+
+                    }
+
+
+                    if (_planB)
+                    {
+                        _mediaObject.Attributes.Ssrcs.Add(new Ssrc
+                        {
+                            Id = (uint)ssrc,
+                            Attribute = "msid",
+                            Value = $"{_streamId} {_trackId}"
+                        });
+                    }
+
+                    if (rtsxSSrc!=null) 
+                    {
+                        if (_offerRtp.RtcpParameters != null && !string.IsNullOrEmpty(_offerRtp.RtcpParameters.cname))
+                        {
+                            _mediaObject.Attributes.Ssrcs.Add(new Ssrc
+                            {
+                                Id = (uint)ssrc,
+                                Attribute = "cname",
+                                Value = _offerRtp.RtcpParameters.cname
+                            });
+
+                        }
+
+                        if (_planB)
+                        {
+                            _mediaObject.Attributes.Ssrcs.Add(new Ssrc
+                            {
+                                Id = (uint)ssrc,
+                                Attribute = "msid",
+                                Value = $"{_streamId} {_trackId}"
+                            });
+                        }
+
+                        // Associate original and retransmission SSRCs.
+                        _mediaObject.Attributes.SsrcGroups.Add(new SsrcGroup 
+                        {
+                            Semantics = "FID",
+                            SsrcIds = new string[] {ssrc.ToString(),rtsxSSrc.ssrc.ToString() },
+                        });
+
+                    }
+
+                }
+                
+                break;
+
+            case MediaKind.application:
+
+                if (!_oldDataChannelSpec) 
+                {
+                    
+                }
+
+                break;
+
+        }
+
+
 
     }
 
     internal void PlanBStopReceiving(RtpParameters offerRtp)
     {
         throw new NotImplementedException();
+    }
+
+    public override void Resume()
+    {
+        _mediaObject.Direction = "sendonly";
+    }
+
+    public override void SetDtlsRole(DtlsRole _dtlsRole)
+    {
+        // Always 'actpass'.
+        _mediaObject.Attributes.Setup = new Setup { Role = SetupRole.ActPass };
+        
     }
 }

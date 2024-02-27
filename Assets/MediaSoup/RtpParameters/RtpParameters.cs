@@ -74,7 +74,6 @@ namespace Mediasoup.RtpParameter
         public int ssrc;
         public string rid;
         public int codecPayloadType;
-        public int rtx;
         public bool? dtx { get; set; }
         public string scalabilityMode;
         public int scaleResolutionDownBy;
@@ -83,14 +82,21 @@ namespace Mediasoup.RtpParameter
         public bool adaptivePtime;
         public string priority;
         public string networkPriority;
+        public RtxParameters? rtx;
 
         /*
          priority?: 'very-low' | 'low' | 'medium' | 'high';
 	    networkPriority?: 'very-low' | 'low' | 'medium' | 'high';
         */
 
+        public class RtxParameters
+        {
+            public int ssrc { get; set; }
+        }
 
     }
+
+
 
     public enum RtpHeaderExtensionUri
     {

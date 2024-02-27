@@ -126,10 +126,10 @@ namespace Mediasoup.Transports
         public EnhancedEventEmitter observer { get; set; }
 
         //Constructor
-        public Transport(string _direction,string _id,IceParameters _iceParameters,List<RTCIceCandidate> _iceCandidate,
+        public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
                         DtlsParameters _dtlsParameters,SctpParameters _sctpParameters,List<RTCIceServer> _iceServers,
                         RTCIceTransportPolicy _iceTransportPolicy,object _additionalSettings, object _proprietaryConstraints,
-                        TTransportAppData _appData, HandlerInterface handlerFactory,object _extendedRtpCapabilities,
+                        TTransportAppData _appData, HandlerInterface handlerFactory,RtpCapabilities _extendedRtpCapabilities,
                         CanProduceByKind _canProduceKind) 
         {
             id = _id;

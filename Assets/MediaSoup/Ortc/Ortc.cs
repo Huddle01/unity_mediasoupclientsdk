@@ -439,12 +439,12 @@ namespace Mediasoup.Ortc
             return null;
         }
 
-        public static string GetSendingRtpParameters()
+        public static RtpParameters GetSendingRtpParameters(MediaKind kind,RtpCapabilities extendedRtpCapabilities)
         {
             return null;
         }
 
-        public static string GetSendingRemoteRtpParameters()
+        public static RtpParameters GetSendingRemoteRtpParameters(MediaKind kind, RtpCapabilities extendedRtpCapabilities)
         {
             return null;
         }

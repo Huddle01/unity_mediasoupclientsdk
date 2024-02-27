@@ -66,7 +66,7 @@ public class UnifiedPlanUtils
 
             if (rtxSsrc!=-1)
             {
-                encoding.rtx = rtxSsrc;
+                encoding.rtx.ssrc = rtxSsrc;
             }
 
             encodings.Add(encoding);
