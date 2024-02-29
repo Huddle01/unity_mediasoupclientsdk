@@ -228,7 +228,8 @@ namespace h264_profile_level_id
                 throw new System.ArgumentNullException("Invalid profile level id");
             }
 
-            if (profileLevelId.level == Level.L1_b) {
+            if (profileLevelId.level == Level.L1_b)
+            {
                 switch (profileLevelId.profile)
                 {
                     case Profile.ConstrainedBaseline:
@@ -327,8 +328,10 @@ namespace h264_profile_level_id
         /// <para>string: If appropriate profile was provided</para>
         /// <para>null: Unrecognised profile provided</para>
         /// </returns>   
-        public string profileToString(Profile profile) {
-            switch (profile) {
+        public string profileToString(Profile profile)
+        {
+            switch (profile)
+            {
 
                 case Profile.ConstrainedBaseline:
                     {
@@ -492,7 +495,8 @@ namespace h264_profile_level_id
         /// <param name="parameters">parameters</param>
         /// <returns>ProfileLevelId from the profile-level-id key in the parameters</returns>
         /// <exception cref="System.ArgumentNullException">On failure to parse the profile level id</exception>
-        public ProfileLevelId parseSdpProfileLevelId(Dictionary<string, string> parameters) {
+        public ProfileLevelId parseSdpProfileLevelId(Dictionary<string, string> parameters)
+        {
 
             string profileLevelId = parameters["profile-level-id"];
 
@@ -514,7 +518,8 @@ namespace h264_profile_level_id
         /// <param name="parametersB">Dictionary of parameters of RTPCodecCapability of RTPCodecParameter.</param>
         /// <returns>A string representing the codec parameters for the answer.</returns>
         /// <exception cref="System.ArgumentNullException">On failure to parse the profile level id</exception>
-        public bool isSameProfile(Dictionary<string, string> parametersA, Dictionary<string, string> parametersB) {
+        public bool isSameProfile(Dictionary<string, string> parametersA, Dictionary<string, string> parametersB)
+        {
 
             ProfileLevelId profileIdA = parseSdpProfileLevelId(parametersA);
             ProfileLevelId profileIdB = parseSdpProfileLevelId(parametersB);
@@ -552,7 +557,8 @@ namespace h264_profile_level_id
         /// <exception cref="System.ArgumentNullException">On failure to parse the profile level id</exception>
 
         public string generateProfileLevelIdStringForAnswer(Dictionary<string, string> local_supported_params,
-            Dictionary<string, string> remote_offered_params) {
+            Dictionary<string, string> remote_offered_params)
+        {
 
             if (local_supported_params == null || remote_offered_params == null)
             {
@@ -570,7 +576,8 @@ namespace h264_profile_level_id
             {
                 localProfileLevelId = parseSdpProfileLevelId(local_supported_params);
             }
-            catch (Exception e) { 
+            catch (Exception e)
+            {
                 Console.WriteLine("generateProfileLevelIdStringForAnswer() | failed to parse local profile-level-id");
                 return null;
             }
@@ -584,7 +591,7 @@ namespace h264_profile_level_id
                 Console.WriteLine("generateProfileLevelIdStringForAnswer() | failed to parse remote profile-level-id");
                 return null;
             }
-            
+
 
 
             if (localProfileLevelId == null)
@@ -616,7 +623,7 @@ namespace h264_profile_level_id
             }
 
             return false;
-        }   
+        }
 
         private bool isLessLevel(Level levelA, Level levelB)
         {
@@ -637,9 +644,5 @@ namespace h264_profile_level_id
         {
             return isLessLevel(levelA, levelB) ? levelA : levelB;
         }
-
-
-
-
     }
 }
