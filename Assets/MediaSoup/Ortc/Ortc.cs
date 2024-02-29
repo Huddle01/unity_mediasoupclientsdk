@@ -441,6 +441,26 @@ namespace Mediasoup.Ortc
 
         public static RtpParameters GetSendingRtpParameters(MediaKind kind,RtpCapabilities extendedRtpCapabilities)
         {
+            RtpParameters rtp = new RtpParameters
+            {
+                mid = null,
+                codecs = new List<RtpCodecParameters>(),
+                encodings = new List<RtpEncodingParameters>(),
+                headerExtensions = new List<RtpHeaderExtensionParameters>(),
+                RtcpParameters = new RtcpParameters()
+            };
+
+            foreach (RtpCodecCapability extendedCodec in extendedRtpCapabilities.codecs)
+            {
+                
+            }
+
+            return null;
+
+        }
+
+        public static List<RtpCodecParameters> ReduceCodecs(List<RtpCodecParameters> codecs, RtpCodecCapability capCodec) 
+        {
             return null;
         }
 

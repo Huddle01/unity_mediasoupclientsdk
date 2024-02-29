@@ -271,7 +271,7 @@ public class RemoteSdp
         ReplaceMediaSection(mediaSection);
     }
 
-    public void SendSctpAssociation(object _offerMediaObject) 
+    public void SendSctpAssociation(MediaDescription _offerMediaObject) 
     {
         AnswerMediaSection mediaSection = new AnswerMediaSection(iceParameters, iceCandidates, dtlsParameters, sctpParameters, plainRtpParameters,
                                                     false, _offerMediaObject);

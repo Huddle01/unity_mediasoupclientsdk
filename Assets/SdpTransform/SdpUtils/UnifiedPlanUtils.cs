@@ -7,9 +7,9 @@ using Utilme.SdpTransform;
 using System;
 using System.Linq;
 
-public class UnifiedPlanUtils
+public static class UnifiedPlanUtils
 {
-    public List<RtpEncodingParameters> GetRtpEncodingParameters(MediaDescription offerMediaObject)
+    public static List<RtpEncodingParameters> GetRtpEncodingParameters(MediaDescription offerMediaObject)
     {
         List<int> ssrcs = new List<int>();
 
@@ -77,7 +77,7 @@ public class UnifiedPlanUtils
 
     }
 
-    public void AddLegacySimulcast(MediaDescription offerMediaObject, int numStreams)
+    public static void AddLegacySimulcast(MediaDescription offerMediaObject, int numStreams)
     {
         if (numStreams <= 1)
         {
