@@ -260,14 +260,10 @@ namespace Mediasoup.Transports
         {
             HandlerInterface _handler = handlerInterface;
 
-            DtlsParameters dtlsParameters = new DtlsParameters();
-
-            Tuple<DtlsParameters, Action> temp = Tuple.Create<DtlsParameters, Action>(dtlsParameters, ClosePendingConsumers);
-
             _handler.On("@connect", async (args) =>
             {
                 var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
-                var dtlsParams = parameters.Item1;
+                DtlsParameters dtlsParams = parameters.Item1;
                 var connectCallback = parameters.Item2;
                 var connectErrback = parameters.Item3;
 
@@ -278,6 +274,42 @@ namespace Mediasoup.Transports
 
                 _ = await _handler.SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
             });
+
+            _handler.On("@icegatheringstatechange", async (args) =>
+            {
+                RTCIceGatheringState _iceGatheringState = (RTCIceGatheringState)args[0];
+
+                if (iceGatheringState == _iceGatheringState) 
+                {
+                    return;
+                }
+
+                iceGatheringState = _iceGatheringState;
+
+                if (!isClosed)
+                {
+                    _ = await _handler.SafeEmit("icegatheringstatechange", _iceGatheringState);
+                }
+            });
+
+            _handler.On("@connectionstatechange", async (args) =>
+            {
+                RTCIceConnectionState _connectionState = (RTCIceConnectionState)args[0];
+
+                if (connectionState == _connectionState)
+                {
+                    return;
+                }
+
+                connectionState = _connectionState;
+
+                if (!isClosed)
+                {
+                    _ = await _handler.SafeEmit("connectionstatechange", _connectionState);
+                }
+            });
+
+
         }
 
         private void HandleProducer(Producer<AppData> _producer) 
