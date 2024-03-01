@@ -16,7 +16,7 @@ namespace Mediasoup.DataConsumers
         bool isClosed { get;}
         SctpStreamParameters sctpStreamParameters { get;}
         object dataConsumerAppData { get;}
-        EnhancedEventEmitter observer { get;}
+        EnhancedEventEmitter<DataConsumerEvents> observer { get;}
 
         void Close();
         void TransportClosed();
@@ -30,7 +30,7 @@ namespace Mediasoup.DataConsumers
         public bool isClosed { get; private set; }
         public SctpStreamParameters sctpStreamParameters { get; private set; }
         public object dataConsumerAppData { get; private set; }
-        public EnhancedEventEmitter observer { get; private set; }
+        public EnhancedEventEmitter<DataConsumerEvents> observer { get; private set; }
 
         public DataConsumer(string _id,string _dataProducerId, RTCDataChannel _dataChannel, SctpStreamParameters _sctpStreamParameters,
                                 TDataConsumerAppData _appData) 
@@ -41,7 +41,7 @@ namespace Mediasoup.DataConsumers
             sctpStreamParameters = _sctpStreamParameters;
             if (_appData != null) dataConsumerAppData = _appData ?? typeof(TDataConsumerAppData).New<TDataConsumerAppData>()!;
 
-            observer = new EnhancedEventEmitter<ConsumerObserverEvents>();
+            observer = new EnhancedEventEmitter<DataConsumerEvents>();
 
             HandleDataChannel();
         }

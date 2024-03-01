@@ -47,7 +47,7 @@ namespace Mediasoup.Transports
         Dictionary<string, IConsumer> pendingCloseConsumers { get; }
         bool consumerCloseInProgress { get; }
 
-        EnhancedEventEmitter observer { get; set; }
+        EnhancedEventEmitter<TransportObserverEvents> observer { get; set; }
 
         void Close();
         RTCStatsReport GetStats();
@@ -70,8 +70,6 @@ namespace Mediasoup.Transports
         void PausePendingConsumers();
         void ResumePendingConsumers();
         void ClosePendingConsumers();
-
-
 
     }
 
@@ -123,7 +121,7 @@ namespace Mediasoup.Transports
 
         public bool consumerCloseInProgress { get; private set; }
 
-        public EnhancedEventEmitter observer { get; set; }
+        public EnhancedEventEmitter<TransportObserverEvents> observer { get; set; }
 
         //Constructor
         public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
@@ -211,9 +209,8 @@ namespace Mediasoup.Transports
 
         public RTCStatsReport GetStats()
         {
-            throw new NotImplementedException();
+            return null;
         }
-
         public Task RestartIceAsync(IceParameters iceParameters)
         {
             throw new NotImplementedException();
@@ -261,7 +258,26 @@ namespace Mediasoup.Transports
 
         private void HandleHandler() 
         {
-        
+            HandlerInterface _handler = handlerInterface;
+
+            DtlsParameters dtlsParameters = new DtlsParameters();
+
+            Tuple<DtlsParameters, Action> temp = Tuple.Create<DtlsParameters, Action>(dtlsParameters, ClosePendingConsumers);
+
+            _handler.On("@connect", async (args) =>
+            {
+                var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
+                var dtlsParams = parameters.Item1;
+                var connectCallback = parameters.Item2;
+                var connectErrback = parameters.Item3;
+
+                if (isClosed) { 
+                    connectErrback("closed");
+                    return;
+                }
+
+                _ = await _handler.SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
+            });
         }
 
         private void HandleProducer(Producer<AppData> _producer) 
@@ -397,7 +413,7 @@ namespace Mediasoup.Transports
 
     public class TransportEvents 
     {
-        public Tuple<Action<DtlsParameters>, Action<string>> Connect;
+        public Tuple<DtlsParameters, Action, Action<string>> Connect;
         public Action<RTCIceGatheringState> Icegatheringstatechange;
         public Action<RTCIceConnectionState> connectionstatechange;
         public Tuple<MediaKind, RtpParameters, object, Action<string>, Action<string>> Produce;

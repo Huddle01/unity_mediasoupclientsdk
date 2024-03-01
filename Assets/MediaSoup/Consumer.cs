@@ -24,7 +24,7 @@ namespace Mediasoup
         void Resume();
         void TransportClosed();
 
-        EnhancedEventEmitter observer { get; set; }
+        EnhancedEventEmitter<ConsumerObserverEvents> observer { get; set; }
 
     }
 
@@ -42,7 +42,7 @@ namespace Mediasoup
         public bool isPaused { get; set; }
 
 
-        public EnhancedEventEmitter observer { get; set; }
+        public EnhancedEventEmitter<ConsumerObserverEvents> observer { get; set; }
 
         public Consumer(string _id,string _localId, string _producerId, RTCRtpReceiver _rtpReceiver,
                             MediaStreamTrack _track, RtpParameters _rtpParameters, TConsumerAppData? _appData) : base()

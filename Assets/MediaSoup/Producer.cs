@@ -27,7 +27,7 @@ namespace Mediasoup
 
         object appData { get; }
 
-        EnhancedEventEmitter observer { get;}
+        EnhancedEventEmitter<ProducerObserverEvents> observer { get;}
 
         void Close();
         void TransportClosed();
@@ -69,7 +69,7 @@ namespace Mediasoup
 
         public object appData { get; private set; }
 
-        public EnhancedEventEmitter observer { get; set; }
+        public EnhancedEventEmitter<ProducerObserverEvents> observer { get; set; }
 
         public Producer(TProducerAppData? _appData)
         {

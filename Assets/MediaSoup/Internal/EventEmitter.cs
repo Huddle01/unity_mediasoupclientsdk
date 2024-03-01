@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System;
 using System.Threading.Tasks;
 using System.Threading;
+using UnityEngine;
 
 namespace Mediasoup.Internal 
 {
@@ -39,47 +40,55 @@ namespace Mediasoup.Internal
             }
         }
 
-        private readonly Dictionary<string, ValueTuple<EventHandler?, ReaderWriterLockSlim>> namedHandlers = new();
-        private readonly ReaderWriterLockSlim readerWriterLock = new();
+        private readonly Dictionary<string, EventHandler> namedHandlers = new();
+        
 
-        private ValueTuple<EventHandler?, ReaderWriterLockSlim> CreateHandlers(string name)
+        private EventHandler CreateHandlers(string name)
         {
             if (namedHandlers.TryGetValue(name, out var handlers)) return handlers;
-            readerWriterLock.EnterWriteLock();
             if (namedHandlers.TryGetValue(name, out handlers)) return handlers;
-            handlers = new ValueTuple<EventHandler?, ReaderWriterLockSlim>(
-                null,
-                new ReaderWriterLockSlim());
+            handlers = null;
             namedHandlers.Add(name, handlers);
-            readerWriterLock.ExitWriteLock();
             return handlers;
         }
 
-        public IDisposable On(string name, EventHandler handler)
+        public void On(string name, EventHandler handler)
+        {
+            EventHandler tuple = CreateHandlers(name);
+
+            if (tuple == null) 
+            {
+                namedHandlers[name] += handler;
+            }
+
+            tuple += handler;
+        }
+
+        /*public IDisposable On<TArgs>(string name,TArgs genOb, EventHandler handler)
         {
             var tuple = CreateHandlers(name);
             tuple.Item1 += handler;
             return new EventListener(() => tuple.Item1 -= handler);
-        }
+        }*/
 
         public void Once(string name, EventHandler handler)
         {
-            var tuple = CreateHandlers(name);
+            EventHandler tuple = CreateHandlers(name);
             EventHandler? h = null;
             h = async args =>
             {
                 await handler(args);
-                tuple.Item1 -= h;
+                tuple -= h;
             };
-            tuple.Item1 += h;
+            tuple += h;
         }
 
-        public IDisposable AddEventListener(string name, EventHandler handler) => On(name, handler);
+        public void AddEventListener(string name, EventHandler handler) => On(name, handler);
 
         public void Off(string name, EventHandler handler)
         {
             if (!namedHandlers.TryGetValue(name, out var tuple)) return;
-            tuple.Item1 -= handler;
+            tuple -= handler;
         }
 
         public void RemoveListener(string name, EventHandler handler) => Off(name, handler);
@@ -87,21 +96,24 @@ namespace Mediasoup.Internal
         public void RemoveAllListeners(string name)
         {
             if (!namedHandlers.TryGetValue(name, out _)) return;
-            readerWriterLock.EnterWriteLock();
             namedHandlers.Remove(name);
-            readerWriterLock.ExitWriteLock();
         }
 
         public async Task Emit(string name, params object?[]? data)
         {
-            if (!namedHandlers.TryGetValue(name, out var handlers)) return;
-            handlers.Item2.EnterReadLock();
-            await handlers.Item1!.Invoke(data);
-            handlers.Item2.EnterReadLock();
+            if (!namedHandlers.TryGetValue(name, out var handlers)) 
+            {
+                return;
+            }
+
+            Debug.Log($"{name} Does exist");
+            if (handlers == null) Debug.Log($"handler is null");
+            await handlers.Invoke(data);
+            
         }
 
         protected int ListenerCount(string name) => namedHandlers.TryGetValue(name, out var list)
-            ? list.Item1!.GetInvocationList().Length
+            ? list!.GetInvocationList().Length
             : 0;
 
     }
