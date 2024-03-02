@@ -10,12 +10,16 @@ using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Dynamic;
 using System.Linq;
+using UnityEditor.PackageManager;
+using h264_profile_level_id;
 
-namespace Mediasoup.Ortc 
+namespace Mediasoup.Ortc
 {
     public class Ortc
     {
-        public static void ValidateRtpCapabilities(RtpCapabilities caps) 
+        static h264_profile_level_id.H264PRofileLevelId h264 = new H264PRofileLevelId();
+
+        public static void ValidateRtpCapabilities(RtpCapabilities caps)
         {
             if (caps == null)
             {
@@ -38,22 +42,22 @@ namespace Mediasoup.Ortc
             }
         }
 
-        public static void ValidateRtpCodecCapability(RtpCodecCapability codec) 
+        public static void ValidateRtpCodecCapability(RtpCodecCapability codec)
         {
-            if (codec==null) 
+            if (codec == null)
             {
                 throw new ArgumentNullException(nameof(codec));
             }
 
             // mimeType is mandatory.
-            if (string.IsNullOrEmpty(codec.mimeType)) 
+            if (string.IsNullOrEmpty(codec.mimeType))
             {
                 throw new InvalidOleVariantTypeException("missing codec.mimeType");
             }
 
             Regex mimeTypeRegex = new Regex(@"^(audio|video)/(.+)", RegexOptions.ECMAScript | RegexOptions.IgnoreCase);
 
-            if (!mimeTypeRegex.IsMatch(codec.mimeType)) 
+            if (!mimeTypeRegex.IsMatch(codec.mimeType))
             {
                 throw new ArgumentException("invalid codec.mimeType");
             }
@@ -71,12 +75,12 @@ namespace Mediasoup.Ortc
             }
             else
             {
-                codec.channels =-1;
+                codec.channels = -1;
             }
 
             // parameters is optional. If unset, set it to an empty object.
             if (codec.parameters == null)
-                codec.parameters = new Dictionary<string, object>();
+                codec.parameters = new Dictionary<string, string>();
 
             foreach (var (key, val) in codec.parameters)
             {
@@ -114,15 +118,15 @@ namespace Mediasoup.Ortc
 
         }
 
-        public static void ValidateRtcpFeedback(RtcpFeedback fb) 
+        public static void ValidateRtcpFeedback(RtcpFeedback fb)
         {
-            if (fb == null) 
+            if (fb == null)
             {
                 throw new ArgumentNullException(nameof(fb));
             }
 
             // type is mandatory.
-            if (string.IsNullOrEmpty(fb.type)) 
+            if (string.IsNullOrEmpty(fb.type))
             {
                 throw new InvalidOleVariantTypeException("missing fb.type");
             }
@@ -135,7 +139,7 @@ namespace Mediasoup.Ortc
 
         }
 
-        public static void ValidateRtpHeaderExtension(RtpHeaderExtension ext) 
+        public static void ValidateRtpHeaderExtension(RtpHeaderExtension ext)
         {
             if (ext == null)
             {
@@ -214,7 +218,7 @@ namespace Mediasoup.Ortc
 
             var mimeTypeMatch = mimeTypeRegex.Matches(codec.mimeType);
 
-            if (mimeTypeMatch.Count==0)
+            if (mimeTypeMatch.Count == 0)
             {
                 throw new ArgumentException("invalid codec.mimeType");
             }
@@ -401,7 +405,7 @@ namespace Mediasoup.Ortc
 
         public static void ValidateIceParameters()
         {
-            
+
         }
 
         public static void ValidateIceCandidate()
@@ -429,9 +433,52 @@ namespace Mediasoup.Ortc
 
         }
 
-        public static string GetExtendedRtpCapabilities()
+        public static RtpCapabilities GetExtendedRtpCapabilities(RtpCapabilities localCaps, RtpCapabilities remoteCaps)
         {
-            return null;
+            RtpCapabilities extendedRtpCapabilities = new RtpCapabilities();
+
+            foreach (RtpCodecCapability remoteCodec in remoteCaps.codecs)
+            {
+                if (IsRtxCodec(remoteCodec))
+                {
+                    continue;
+                }
+
+                RtpCodecCapability matchingLocalCodec = null;
+                if (localCaps.codecs != null)
+                {
+                    foreach (RtpCodecCapability localCodec in localCaps.codecs)
+                    {
+                        if (MatchCodecs(localCodec, remoteCodec, true, true))
+                        {
+                            matchingLocalCodec = localCodec;
+                            break;
+                        }
+                    }
+                }
+
+                if (matchingLocalCodec == null)
+                {
+                    continue;
+                }
+
+                ExtendedRtpCodecParameters extendedCodec = new ExtendedRtpCodecParameters
+                {
+                    mimeType = matchingLocalCodec.mimeType,
+                    kind = matchingLocalCodec.kind,
+                    clockRate = matchingLocalCodec.clockRate,
+                    channels = matchingLocalCodec.channels,
+                    localPayloadType = matchingLocalCodec.preferredPayloadType,
+                    remotePayloadType = remoteCodec.preferredPayloadType,
+                    localParameters = matchingLocalCodec.parameters,
+                    remoteParameters = remoteCodec.parameters,
+                    rtcpFeedback = ReduceRtcpFeedback(matchingLocalCodec, remoteCodec),
+                };
+
+
+
+
+            }
         }
 
         public static string GetRecvRtpCapabilities()
@@ -439,7 +486,7 @@ namespace Mediasoup.Ortc
             return null;
         }
 
-        public static RtpParameters GetSendingRtpParameters(MediaKind kind,RtpCapabilities extendedRtpCapabilities)
+        public static RtpParameters GetSendingRtpParameters(MediaKind kind, RtpCapabilities extendedRtpCapabilities)
         {
             return null;
         }
@@ -464,23 +511,143 @@ namespace Mediasoup.Ortc
             return false;
         }
 
-        public static bool isRtxCodec() 
+        public static bool IsRtxCodec(RtpCodecCapability codec)
         {
-            return false;
+            if (codec == null)
+            {
+                return false;
+            }
+
+            return Regex.IsMatch(codec.mimeType ?? "", @".+\/rtx$", RegexOptions.IgnoreCase);
         }
 
-        public static bool MatchCodecs()
+        public static bool MatchCodecs(RtpCodecCapability aCodec, RtpCodecCapability bCodec, bool strict = false, bool modify = false)
         {
-            return false;
+            string aMimeType = aCodec.mimeType.ToLower();
+            string bMimeType = bCodec.mimeType.ToLower();
+
+            if (aMimeType != bMimeType)
+            {
+                return false;
+            }
+
+            if (aCodec.clockRate != bCodec.clockRate)
+            {
+                return false;
+            }
+
+            if (aCodec.channels != bCodec.channels)
+            {
+                return false;
+            }
+
+            switch (aMimeType)
+            {
+                case "video/h264":
+                    {
+                        if (strict)
+                        {
+                            object aPacketizationMode = aCodec.parameters["packetization-mode"];
+                            object bPacketizationMode = bCodec.parameters["packetization-mode"];
+
+                            if (aPacketizationMode != bPacketizationMode)
+                            {
+                                return false;
+                            }
+
+
+
+                            if (!h264.isSameProfile(aCodec.parameters, bCodec.parameters))
+                            {
+                                return false;
+                            }
+
+                            string selectedProfileLevelId;
+
+                            try
+                            {
+                                selectedProfileLevelId = h264.generateProfileLevelIdStringForAnswer(
+                                   aCodec.parameters,
+                                   bCodec.parameters
+                               );
+                            }
+                            catch (Exception err)
+                            {
+                                Console.WriteLine("Error generating profile-level-id string for answer: " + err.Message);
+                                return false;
+                            }
+
+                            if (modify)
+                            {
+                                if (selectedProfileLevelId != null)
+                                {
+                                    aCodec.parameters["profile-level-id"] = selectedProfileLevelId;
+                                    bCodec.parameters["profile-level-id"] = selectedProfileLevelId;
+                                }
+                                else
+                                {
+                                    if (aCodec.parameters.ContainsKey("profile-level-id"))
+                                    {
+                                        aCodec.parameters.Remove("profile-level-id");
+                                    }
+
+                                    if (bCodec.parameters.ContainsKey("profile-level-id"))
+                                    {
+                                        bCodec.parameters.Remove("profile-level-id");
+                                    }
+                                }
+                            }
+                        }
+
+                        break;
+                    }
+
+                case "video/vp9":
+                    {
+                        if (strict)
+                        {
+                            string aProfileId = aCodec.parameters["profile-id"];
+                            string bProfileId = bCodec.parameters["profile-id"];
+
+                            if (aProfileId != bProfileId)
+                            {
+                                return false;
+                            }
+                        }
+
+                        break;
+                    }
+            }
+
+            return true;
         }
+
         public static bool MatchHeaderExtensions()
         {
             return false;
         }
-        public static string ReduceRtcpFeedback()
+        public static List<RtcpFeedback> ReduceRtcpFeedback(RtpCodecCapability codecA, RtpCodecCapability codecB)
         {
-            return null;
+            List<RtcpFeedback> reducedRtcpFeedback = new List<RtcpFeedback>();
+
+            foreach (RtcpFeedback aFb in codecA.rtcpFeedback)
+            {
+                foreach (RtcpFeedback bFb in codecB.rtcpFeedback)
+                {
+                    if (aFb.type == bFb.type)
+                    {
+                        if (aFb.parameters == bFb.parameters || (aFb.parameters == null && bFb.parameters == null))
+                        {
+                            reducedRtcpFeedback.Add(aFb);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return reducedRtcpFeedback;
         }
+
         public static byte GetH264PacketizationMode()
         {
             return byte.MaxValue;
@@ -501,22 +668,22 @@ namespace Mediasoup.Ortc
 
     }
 
-    public static class OrtcUtils 
+    public static class OrtcUtils
     {
-        public static void AddNackSuppportForOpus(RtpCapabilities rtpCapabilities) 
+        public static void AddNackSuppportForOpus(RtpCapabilities rtpCapabilities)
         {
-            foreach (var codec in rtpCapabilities.codecs) 
+            foreach (var codec in rtpCapabilities.codecs)
             {
-                if ((codec.mimeType.ToLower() == "audio/opus" || codec.mimeType.ToLower() == "audio/multiopus") && 
-                    (codec.rtcpFeedback?.Any(fb => fb.type == "nack" && fb.parameters == null) == true)) 
+                if ((codec.mimeType.ToLower() == "audio/opus" || codec.mimeType.ToLower() == "audio/multiopus") &&
+                    (codec.rtcpFeedback?.Any(fb => fb.type == "nack" && fb.parameters == null) == true))
                 {
-                    if (codec.rtcpFeedback!=null) 
+                    if (codec.rtcpFeedback != null)
                     {
                         codec.rtcpFeedback = new List<RtcpFeedback>();
                     }
 
 
-                    RtcpFeedback nackSupp = new RtcpFeedback {type = "nack",parameters =  "" };
+                    RtcpFeedback nackSupp = new RtcpFeedback { type = "nack", parameters = "" };
                     codec.rtcpFeedback.Add(nackSupp);
                 }
             }

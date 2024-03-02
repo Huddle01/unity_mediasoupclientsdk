@@ -28,15 +28,15 @@ namespace Mediasoup.RtpParameter
     }
 
     [Serializable]
-    public class RtpCodecCapability 
+    public class RtpCodecCapability
     {
-        public MediaKind kind;
         public string mimeType;
-        public int preferredPayloadType;
         public int clockRate;
         public int channels;
-        public Dictionary<string, object> parameters = new Dictionary<string, object>();
+        public Dictionary<string, string> parameters = new Dictionary<string, string>();
         public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
+        public MediaKind kind;
+        public int preferredPayloadType;
     }
 
     [Serializable]
@@ -50,15 +50,24 @@ namespace Mediasoup.RtpParameter
     }
 
     [Serializable]
-    public class RtpCodecParameters 
+    public class RtpCodecParameters: RtpCodecCapability
+    {
+        public int payloadType;
+    }
+
+    public class ExtendedRtpCodecParameters
     {
         public string mimeType;
-        public int payloadType;
+        public MediaKind kind;
         public int clockRate;
         public int channels;
-        public IDictionary<string, object> parameters { get; set; }
+        public int localPayloadType;
+        public int localRtxPayloadType;
+        public int remotePayloadType;
+		public int remoteRtxPayloadType;
+        public Dictionary<string, string> localParameters;
+        public Dictionary<string, string> remoteParameters;
         public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
-
     }
 
     [Serializable]

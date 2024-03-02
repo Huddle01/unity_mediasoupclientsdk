@@ -14,10 +14,10 @@ using System.Security.Cryptography;
 
 namespace h264_profile_level_id
 {
-    class H264PRofileLevelId
+    public class H264PRofileLevelId
     {
         static List<ProfilePattern> profilePatterns = new List<ProfilePattern>();
-        static ProfileLevelId defaultProfileLevelId = new ProfileLevelId(Profile.ConstrainedBaseline, Level.L3_1);
+        public static ProfileLevelId defaultProfileLevelId = new ProfileLevelId(Profile.ConstrainedBaseline, Level.L3_1);
         static H264PRofileLevelId()
         {
             profilePatterns.Add(new ProfilePattern(0x42, new BitPattern("x1xx0000"), Profile.ConstrainedBaseline));
