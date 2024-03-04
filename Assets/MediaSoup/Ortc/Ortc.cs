@@ -69,20 +69,27 @@ namespace Mediasoup.Ortc
                 throw new ArgumentException("invalid codec.mimeType");
             }
 
-            // Just override kind with media component of mimeType.
-            codec.kind = codec.mimeType.ToLower().StartsWith(nameof(MediaKind.video))
-                ? MediaKind.video
-                : MediaKind.audio;
+            string mimeType = mimeTypeRegex.Match(codec.mimeType).Value;
 
+            // Just override kind with media component of mimeType.
+            codec.kind = mimeType == "video" ? MediaKind.video : MediaKind.audio;
+
+            // preferredPayloadType is optional, no check required
+
+            // clockRate is mandatory.
+            if (codec.clockRate == null) {
+                throw new ArgumentNullException("Clock rate is missing");
+            }
 
             // channels is optional. If unset, set it to 1 (just if audio).
-            if (codec is { kind: MediaKind.audio })
+            if (codec.kind == MediaKind.audio)
             {
-                codec.channels = 1;
+                if (codec.channels == null) {
+                    codec.channels = 1;
+                }
             }
-            else
-            {
-                codec.channels = -1;
+            else { 
+                codec.channels = null;
             }
 
             // parameters is optional. If unset, set it to an empty object.
@@ -107,7 +114,7 @@ namespace Mediasoup.Ortc
                 // Specific parameters validation.
                 if (key == "apt")
                 {
-                    if (value is not (uint or int or ulong or long or byte or sbyte))
+                    if (value is not string)
                     {
                         throw new InvalidOleVariantTypeException("invalid codec apt parameter");
                     }
@@ -331,44 +338,21 @@ namespace Mediasoup.Ortc
         }
 
         /// <summary>
-        ///     Validates RTP Parameters
+        ///     Validates Rtcp Parameters
         /// </summary>
         /// <param name="rtcp"></param>
         /// <exception cref="ArgumentNullException"></exception>
-        public static void ValidateRtcpParameters(RtpParameters rtpParameters)
+        public static void ValidateRtcpParameters(RtcpParameters rtcpParameters)
         {
-            if (rtpParameters == null) { 
-                throw new ArgumentNullException(nameof(rtpParameters));
-            }
-
-            foreach (RtpCodecCapability rtpCodecCapability in rtpParameters.codecs)
+            if (rtcpParameters == null)
             {
-                ValidateRtpCodecCapability(rtpCodecCapability);
+                throw new ArgumentNullException(nameof(rtcpParameters));
             }
 
-            if (rtpParameters.headerExtensions == null) {
-                rtpParameters.headerExtensions = new List<RtpHeaderExtensionParameters>();
-            }
+            // cname is optional
 
-            foreach (RtpHeaderExtensionParameters rtpHeaderExtension in rtpParameters.headerExtensions) { 
-                ValidateRtpHeaderExtensionParameters(rtpHeaderExtension);
-            }
-
-            if (rtpParameters.encodings == null)
-            {
-                rtpParameters.encodings = new List<RtpEncodingParameters>();
-            }
-
-            foreach (RtpEncodingParameters rtpEncoding in rtpParameters.encodings)
-            {
-                ValidateRtpEncodingParameters(rtpEncoding);
-            }
-
-            if (rtpParameters.rtcpParameters == null) {
-                rtpParameters.rtcpParameters = new RtcpParameters();
-            }
-
-            ValidateRtcpParameters(rtpParameters);
+            // reducedSize is optional. If unset set it to true.
+            rtcpParameters.reducedSize ??= true;
         }
 
         public static void ValidateSctpCapabilities(SctpCapabilities caps)
@@ -437,36 +421,6 @@ namespace Mediasoup.Ortc
                     => false,
                 _ => param.ordered
             };
-        }
-
-        public static void ValidateIceParameters()
-        {
-
-        }
-
-        public static void ValidateIceCandidate()
-        {
-
-        }
-
-        public static void ValidateIceCandidates()
-        {
-
-        }
-
-        public static void ValidateDtlsFingerprint()
-        {
-
-        }
-
-        public static void ValidateDtlsParameters()
-        {
-
-        }
-
-        public static void ValidateProducerCodecOptions()
-        {
-
         }
 
         public static ExtendedRtpCapabilities GetExtendedRtpCapabilities(RtpCapabilities localCaps, RtpCapabilities remoteCaps)
@@ -833,16 +787,18 @@ namespace Mediasoup.Ortc
 
         public static RtpParameters GenerateProbatorRtpParameters(RtpParameters videoRtpParameters)
         {
-            RtpParameters copyRtpParameters = (RtpParameters) videoRtpParameters.Clone();
+            RtpParameters copyRtpParameters = (RtpParameters)videoRtpParameters.Clone();
 
             ValidateRtpParameters(copyRtpParameters);
 
-            RtpParameters rtpParameters = new RtpParameters {
+            RtpParameters rtpParameters = new RtpParameters
+            {
                 mid = RTP_PROBATOR_MID,
                 codecs = new List<RtpCodecParameters>(),
                 headerExtensions = new List<RtpHeaderExtensionParameters>(),
                 encodings = new List<RtpEncodingParameters>(),
-                rtcpParameters = new RtcpParameters {
+                rtcpParameters = new RtcpParameters
+                {
                     cname = "probator"
                 }
             };
@@ -856,12 +812,21 @@ namespace Mediasoup.Ortc
 
         public static bool CanSend(MediaKind kind, ExtendedRtpCapabilities rtpCapabilities)
         {
-            return rtpCapabilities.codecs.Exists(codec =>  codec.kind == kind);
+            return rtpCapabilities.codecs.Exists(codec => codec.kind == kind);
         }
 
-        public static bool CanReceive(RtpParameters rtpParameters, ExtendedRtpCapabilities rtpCapabilities)
+        public static bool CanReceive(RtpParameters rtpParameters, ExtendedRtpCapabilities extendedRtpCapabilities)
         {
-            ValidateRtcpParameters(rtpParameters)
+            ValidateRtpParameters(rtpParameters);
+
+            if (rtpParameters.codecs.Count == 0)
+            {
+                return false;
+            }
+
+            RtpCodecParameters rtpCodecCapability = rtpParameters.codecs[0];
+
+            return extendedRtpCapabilities.codecs.Exists(codec => codec.remotePayloadType == rtpCodecCapability.preferredPayloadType);
         }
 
         public static bool IsRtxCodec(RtpCodecCapability codec)
