@@ -11,13 +11,26 @@ namespace Mediasoup.RtpParameter
 {
     
     [Serializable]
-    public class RtpParameters
+    public class RtpParameters: ICloneable
     {
-        public string mid;
+        public string? mid;
         public List<RtpCodecParameters> codecs = new List<RtpCodecParameters>();
         public List<RtpHeaderExtensionParameters> headerExtensions = new List<RtpHeaderExtensionParameters>();
         public List<RtpEncodingParameters> encodings = new List<RtpEncodingParameters>();
-        public RtcpParameters RtcpParameters;
+        public RtcpParameters rtcpParameters;
+
+
+        public object Clone()
+        {
+            RtpParameters rtpParameter = new RtpParameters();
+            rtpParameter.mid = this.mid;
+            rtpParameter.rtcpParameters = this.rtcpParameters;
+            rtpParameter.encodings = this.encodings;
+            rtpParameter.headerExtensions = this.headerExtensions;
+            rtpParameter.codecs = this.codecs;
+
+            return rtpParameter;
+        }
     }
 
     [Serializable]
@@ -35,14 +48,16 @@ namespace Mediasoup.RtpParameter
         public int channels;
         public Dictionary<string, string> parameters = new Dictionary<string, string>();
         public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
-        public MediaKind kind;
+
+        // This field is not present in the original typescript definition for RtpCodecParameters
+        public Nullable<MediaKind> kind;
         public int preferredPayloadType;
     }
 
     [Serializable]
     public class RtpHeaderExtension 
     {
-        public MediaKind kind;
+        public Nullable<MediaKind> kind;
         public string uri;
         public int preferredId;
         public bool? preferredEncrypt { get; set; }
@@ -55,16 +70,29 @@ namespace Mediasoup.RtpParameter
         public int payloadType;
     }
 
-    public class ExtendedRtpCodecParameters
+
+    [Serializable]
+    public class ExtendedRtpCapabilities
+    {
+        public List<ExtendedRtpCodecCapability> codecs = new List<ExtendedRtpCodecCapability>();
+        public List<ExtendedRtpHeaderExtension> headerExtensions = new List<ExtendedRtpHeaderExtension>();
+    }
+
+    public class ExtendedRtpHeaderExtension: RtpHeaderExtension {
+        public int sendId;
+        public int recvId;
+    }
+
+    public class ExtendedRtpCodecCapability
     {
         public string mimeType;
         public MediaKind kind;
         public int clockRate;
         public int channels;
         public int localPayloadType;
-        public int localRtxPayloadType;
+        public Nullable<int> localRtxPayloadType;
         public int remotePayloadType;
-		public int remoteRtxPayloadType;
+		public Nullable<int> remoteRtxPayloadType;
         public Dictionary<string, string> localParameters;
         public Dictionary<string, string> remoteParameters;
         public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
