@@ -240,10 +240,10 @@ namespace Mediasoup
             RTCRtpEncodingParameters tempParam = new RTCRtpEncodingParameters
             {
                 active = true,
-                maxBitrate = (ulong)parameters.maxBitrate,
-                maxFramerate = (uint)parameters.maxFramerate,
-                rid = parameters.rid,
-                scaleResolutionDownBy = parameters.scaleResolutionDownBy
+                maxBitrate = parameters.MaxBitrate,
+                maxFramerate = parameters.MaxFramerate,
+                rid = parameters.Rid,
+                scaleResolutionDownBy = parameters.ScaleResolutionDownBy
             };
 
             RTCRtpSendParameters sendParam = rtpSender.GetParameters();

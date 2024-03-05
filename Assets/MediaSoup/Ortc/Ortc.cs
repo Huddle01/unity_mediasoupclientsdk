@@ -491,8 +491,8 @@ namespace Mediasoup.Ortc
             // Normalize supported RTP capabilities.
             ValidateRtpCapabilities(RtpCapabilities.SupportedRtpCapabilities);
 
-            var clonedSupportedRtpCapabilities = RtpCapabilities.SupportedRtpCapabilities.DeepClone();
-            var dynamicPayloadTypes = DynamicPayloadTypes.DeepClone().ToList();
+            var clonedSupportedRtpCapabilities = Utils.Clone(RtpCapabilities.SupportedRtpCapabilities);
+            var dynamicPayloadTypes = Utils.Clone(DynamicPayloadTypes).ToList();
             var caps = new RtpCapabilities
             {
                 Codecs = new List<RtpCodecCapability>(),
@@ -510,7 +510,7 @@ namespace Mediasoup.Ortc
                     ?? throw new Exception($"media codec not supported[mimeType:{mediaCodec.MimeType}]");
 
                 // Clone the supported codec.
-                var codec = matchedSupportedCodec.DeepClone();
+                var codec = Utils.Clone(matchedSupportedCodec);
 
                 // If the given media codec has preferredPayloadType, keep it.
                 if (mediaCodec.PreferredPayloadType.HasValue)
@@ -748,7 +748,7 @@ namespace Mediasoup.Ortc
             }
 
             // Clone Producer encodings since we'll mangle them.
-            var consumableEncodings = parameters.Encodings!.DeepClone();
+            var consumableEncodings = Utils.Clone(parameters.Encodings!);
 
             for (var i = 0; i < consumableEncodings.Count; ++i)
             {
@@ -825,7 +825,7 @@ namespace Mediasoup.Ortc
                 ValidateRtpCodecCapability(capCodec);
             }
 
-            var consumableCodecs = consumableParams.Codecs.DeepClone();
+            var consumableCodecs = Utils.Clone(consumableParams.Codecs);
 
             var rtxSupported = false;
 
@@ -952,7 +952,7 @@ namespace Mediasoup.Ortc
             }
             else
             {
-                var consumableEncodings = consumableParams.Encodings.DeepClone();
+                var consumableEncodings = Utils.Clone(consumableParams.Encodings);
                 var baseSsrc = Utils.GenerateRandomNumber();
                 var baseRtxSsrc = Utils.GenerateRandomNumber();
 
@@ -986,7 +986,7 @@ namespace Mediasoup.Ortc
                 Rtcp = consumableParams.Rtcp
             };
 
-            var consumableCodecs = consumableParams.Codecs.DeepClone();
+            var consumableCodecs = Utils.Clone(consumableParams.Codecs);
 
             foreach (var codec in consumableCodecs)
             {
@@ -1011,7 +1011,7 @@ namespace Mediasoup.Ortc
                 ext.Uri != RtpHeaderExtensionUri.AbsSendTime &&
                 ext.Uri != RtpHeaderExtensionUri.TransportWideCcDraft01).ToList();
 
-            var consumableEncodings = consumableParams.Encodings.DeepClone();
+            var consumableEncodings = Utils.Clone(consumableParams.Encodings);
 
             var baseSsrc = Utils.GenerateRandomNumber();
             var baseRtxSsrc = Utils.GenerateRandomNumber();

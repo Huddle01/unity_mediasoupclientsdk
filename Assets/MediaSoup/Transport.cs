@@ -129,7 +129,7 @@ namespace Mediasoup.Transports
         public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
                         DtlsParameters _dtlsParameters,SctpParameters _sctpParameters,List<RTCIceServer> _iceServers,
                         RTCIceTransportPolicy _iceTransportPolicy,object _additionalSettings, object _proprietaryConstraints,
-                        TTransportAppData _appData, HandlerInterface handlerFactory,RtpCapabilities _extendedRtpCapabilities,
+                        TTransportAppData _appData, HandlerInterface handlerFactory, ExtendedRtpCapabilities _extendedRtpCapabilities,
                         CanProduceByKind _canProduceKind) 
         {
             id = _id;

@@ -1030,18 +1030,18 @@ public class HandlerSendOptions
     public ProducerCodecOptions codecOptions;
     public RtpCodecCapability codec;
 
-    public RTCRtpEncodingParameters[] GetRTCRtpTransceivers(List<RTCRtpEncodingParameters> rtps)
+    public RTCRtpEncodingParameters[] GetRTCRtpTransceivers(List<RtpEncodingParameters> rtps)
     {
         List<RTCRtpEncodingParameters> rtpEncoding = new List<RTCRtpEncodingParameters>();
 
-        foreach (RTCRtpEncodingParameters rtp in rtps)
+        foreach (RtpEncodingParameters rtp in rtps)
         {
             RTCRtpEncodingParameters temp = new RTCRtpEncodingParameters
             {
-                maxBitrate = (ulong) rtp.maxBitrate,
-                maxFramerate = (uint)rtp.maxFramerate,
-                rid = rtp.rid,
-                scaleResolutionDownBy = rtp.scaleResolutionDownBy,
+                maxBitrate = (ulong) rtp.MaxBitrate,
+                maxFramerate = (uint) rtp.MaxFramerate,
+                rid = rtp.Rid,
+                scaleResolutionDownBy = rtp.ScaleResolutionDownBy,
             };
         }
 

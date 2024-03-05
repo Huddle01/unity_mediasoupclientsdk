@@ -224,13 +224,13 @@ public class CommonUtils
 
     }
 
-    public static string GetCName(IList<Ssrc> offerMediaObject)
+    public static string GetCName(MediaDescription offerMediaObject)
     {
         Ssrc ssrc = null;
 
-        if (offerMediaObject != null && offerMediaObject.Count > 0)
+        if (offerMediaObject != null && offerMediaObject.Attributes.Ssrcs.Count > 0)
         {
-            ssrc = offerMediaObject.FirstOrDefault<Ssrc>(x => x.Attribute.ToLower() == "cname");
+            ssrc = offerMediaObject.Attributes.Ssrcs.FirstOrDefault<Ssrc>(x => x.Attribute.ToLower() == "cname");
         }
 
         if (ssrc == null)
@@ -241,7 +241,7 @@ public class CommonUtils
         return ssrc.Value;
     }
 
-    public static void ApplyCodecParameters(RtpParameters offerRtpParameters, Sdp answerMediaObject)
+    public static void ApplyCodecParameters(RtpParameters offerRtpParameters, MediaDescription answerMediaObject)
     {
         foreach (var codec in offerRtpParameters.Codecs)
         {
