@@ -6,70 +6,56 @@ using System;
 using Newtonsoft.Json;
 using System.Text.Json;
 using Newtonsoft.Json.Converters;
+using System.Runtime.Serialization;
 
 namespace Mediasoup.RtpParameter
 {
-    
-    [Serializable]
-    public class RtpParameters: ICloneable
-    {
-        public string? mid;
-        public List<RtpCodecParameters> codecs = new List<RtpCodecParameters>();
-        public List<RtpHeaderExtensionParameters> headerExtensions = new List<RtpHeaderExtensionParameters>();
-        public List<RtpEncodingParameters> encodings = new List<RtpEncodingParameters>();
-        public RtcpParameters rtcpParameters;
-
-
-        public object Clone()
-        {
-            RtpParameters rtpParameter = new RtpParameters();
-            rtpParameter.mid = this.mid;
-            rtpParameter.rtcpParameters = this.rtcpParameters;
-            rtpParameter.encodings = this.encodings;
-            rtpParameter.headerExtensions = this.headerExtensions;
-            rtpParameter.codecs = this.codecs;
-
-            return rtpParameter;
-        }
-    }
 
     [Serializable]
-    public class RtpCapabilities 
+    public class RtpParameters
     {
-        public List<RtpCodecCapability> codecs = new List<RtpCodecCapability>();
-        public List<RtpHeaderExtension> headerExtensions = new List<RtpHeaderExtension>();
+        /// <summary>
+        /// The MID RTP extension value as defined in the BUNDLE specification.
+        /// </summary>
+        public string? Mid { get; set; }
+
+        /// <summary>
+        /// Media and RTX codecs in use.
+        /// </summary>
+        public List<RtpCodecParameters> Codecs { get; set; }
+
+        /// <summary>
+        /// RTP header extensions in use.
+        /// </summary>
+        public List<RtpHeaderExtensionParameters>? HeaderExtensions { get; set; }
+
+        /// <summary>
+        /// Transmitted RTP streams and their settings.
+        /// </summary>
+        public List<RtpEncodingParameters> Encodings { get; set; } = new List<RtpEncodingParameters>();
+
+        /// <summary>
+        /// Parameters used for RTCP.
+        /// </summary>
+        public RtcpParameters Rtcp { get; set; } = new RtcpParameters();
     }
 
-    [Serializable]
-    public class RtpCodecCapability
-    {
-        public string mimeType;
-        public int clockRate;
-        public int channels;
-        public Dictionary<string, string> parameters = new Dictionary<string, string>();
-        public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
+    //[Serializable]
+    //public class RtpCapabilities
+    //{
+    //    public List<RtpCodecCapability> codecs = new List<RtpCodecCapability>();
+    //    public List<RtpHeaderExtension> headerExtensions = new List<RtpHeaderExtension>();
+    //}
 
-        // This field is not present in the original typescript definition for RtpCodecParameters
-        public Nullable<MediaKind> kind;
-        public int preferredPayloadType;
-    }
-
-    [Serializable]
-    public class RtpHeaderExtension 
-    {
-        public Nullable<MediaKind> kind;
-        public string uri;
-        public int preferredId;
-        public bool? preferredEncrypt { get; set; }
-        public RtpHeaderExtensionDirection? direction { get; set; }
-    }
-
-    [Serializable]
-    public class RtpCodecParameters: RtpCodecCapability
-    {
-        public int payloadType;
-    }
-
+    //[Serializable]
+    //public class RtpHeaderExtension
+    //{
+    //    public Nullable<MediaKind> kind;
+    //    public string uri;
+    //    public int preferredId;
+    //    public bool? preferredEncrypt { get; set; }
+    //    public RtpHeaderExtensionDirection? direction { get; set; }
+    //}
 
     [Serializable]
     public class ExtendedRtpCapabilities
@@ -78,7 +64,8 @@ namespace Mediasoup.RtpParameter
         public List<ExtendedRtpHeaderExtension> headerExtensions = new List<ExtendedRtpHeaderExtension>();
     }
 
-    public class ExtendedRtpHeaderExtension: RtpHeaderExtension {
+    public class ExtendedRtpHeaderExtension : RtpHeaderExtension
+    {
         public int sendId;
         public int recvId;
     }
@@ -88,116 +75,125 @@ namespace Mediasoup.RtpParameter
         public string mimeType;
         public MediaKind kind;
         public int clockRate;
-        public int channels;
+        public int? channels;
         public int localPayloadType;
         public Nullable<int> localRtxPayloadType;
         public int remotePayloadType;
-		public Nullable<int> remoteRtxPayloadType;
+        public Nullable<int> remoteRtxPayloadType;
         public Dictionary<string, string> localParameters;
         public Dictionary<string, string> remoteParameters;
         public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
     }
 
     [Serializable]
-    public class RtcpFeedback 
+    public class RtcpFeedback
     {
-        public string type;
-        public string parameters;
+        public string Type { get; set; }
+
+        /// <summary>
+        /// parameter. Nullable.
+        /// </summary>
+        public string? Parameter { get; set; }
     }
+
+    //[Serializable]
+    //public class RtpEncodingParameters
+    //{
+    //    public int ssrc;
+    //    public string rid;
+    //    public int codecPayloadType;
+    //    public bool? dtx { get; set; }
+    //    public string scalabilityMode;
+    //    public int scaleResolutionDownBy;
+    //    public int maxBitrate;
+    //    public int maxFramerate;
+    //    public bool adaptivePtime;
+    //    public string priority;
+    //    public string networkPriority;
+    //    public RtxParameters? rtx;
+
+    //    /*
+    //     priority?: 'very-low' | 'low' | 'medium' | 'high';
+    // networkPriority?: 'very-low' | 'low' | 'medium' | 'high';
+    //    */
+
+    //    public class RtxParameters
+    //    {
+    //        public int ssrc { get; set; }
+    //    }
+
+    //}
 
     [Serializable]
-    public class RtpEncodingParameters 
+    public class Rtx
     {
-        public int ssrc;
-        public string rid;
-        public int codecPayloadType;
-        public bool? dtx { get; set; }
-        public string scalabilityMode;
-        public int scaleResolutionDownBy;
-        public int maxBitrate;
-        public int maxFramerate;
-        public bool adaptivePtime;
-        public string priority;
-        public string networkPriority;
-        public RtxParameters? rtx;
-
-        /*
-         priority?: 'very-low' | 'low' | 'medium' | 'high';
-	    networkPriority?: 'very-low' | 'low' | 'medium' | 'high';
-        */
-
-        public class RtxParameters
-        {
-            public int ssrc { get; set; }
-        }
-
+        public uint Ssrc { get; set; }
     }
 
 
 
-    public enum RtpHeaderExtensionUri
-    {
-        UrnIetfParamsRtpHdrextSdesMid,
-        UrnIetfParamsRtpHdrextSdesRtpStreamId,
-        UrnIetfParamsRtpHdrextSdesRepairedRtpStreamId,
-        HttpToolsIetfAvtextFramemarking07,
-        UrnIetfParamsRtpHdrextFramemarking,
-        UrnIetfParamsRtpHdrextSsrcAudioLevel,
-        Urn3gppVideoOrientation,
-        UrnIetfParamsRtpHdrextToffset,
-        HttpIetfOrgIdDraftHolmerRmcatTransportWideCcExtensions01,
-        HttpWwwIetfOrgIdDraftHolmerRmcatTransportWideCcExtensions01,
-        HttpWwwWebrtcOrgExperimentsRtpHdrextAbsSendTime,
-        HttpWwwWebrtcOrgExperimentsRtpHdrextAbsCaptureTime
-    }
+    //public enum RtpHeaderExtensionUri
+    //{
+    //    UrnIetfParamsRtpHdrextSdesMid,
+    //    UrnIetfParamsRtpHdrextSdesRtpStreamId,
+    //    UrnIetfParamsRtpHdrextSdesRepairedRtpStreamId,
+    //    HttpToolsIetfAvtextFramemarking07,
+    //    UrnIetfParamsRtpHdrextFramemarking,
+    //    UrnIetfParamsRtpHdrextSsrcAudioLevel,
+    //    Urn3gppVideoOrientation,
+    //    UrnIetfParamsRtpHdrextToffset,
+    //    HttpIetfOrgIdDraftHolmerRmcatTransportWideCcExtensions01,
+    //    HttpWwwIetfOrgIdDraftHolmerRmcatTransportWideCcExtensions01,
+    //    HttpWwwWebrtcOrgExperimentsRtpHdrextAbsSendTime,
+    //    HttpWwwWebrtcOrgExperimentsRtpHdrextAbsCaptureTime
+    //}
 
     /***
 
     export type RtpHeaderExtensionUri =
-	| 'urn:ietf:params:rtp-hdrext:sdes:mid'
-	| 'urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id'
-	| 'urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id'
-	| 'http://tools.ietf.org/html/draft-ietf-avtext-framemarking-07'
-	| 'urn:ietf:params:rtp-hdrext:framemarking'
-	| 'urn:ietf:params:rtp-hdrext:ssrc-audio-level'
-	| 'urn:3gpp:video-orientation'
-	| 'urn:ietf:params:rtp-hdrext:toffset'
-	| 'http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01'
-	| 'http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time'
-	| 'http://www.webrtc.org/experiments/rtp-hdrext/abs-capture-time';
+    | 'urn:ietf:params:rtp-hdrext:sdes:mid'
+    | 'urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id'
+    | 'urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id'
+    | 'http://tools.ietf.org/html/draft-ietf-avtext-framemarking-07'
+    | 'urn:ietf:params:rtp-hdrext:framemarking'
+    | 'urn:ietf:params:rtp-hdrext:ssrc-audio-level'
+    | 'urn:3gpp:video-orientation'
+    | 'urn:ietf:params:rtp-hdrext:toffset'
+    | 'http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01'
+    | 'http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time'
+    | 'http://www.webrtc.org/experiments/rtp-hdrext/abs-capture-time';
     **/
 
-    [Serializable]
-    public class RtpHeaderExtensionParameters 
-    {
-        public string uri;
-        public int id;
-        public bool? encrypt { get; set; }
-        public dynamic? parameters { get; set; }
-    }
-
-    [Serializable]
-    public class RtcpParameters 
-    {
-        public string cname;
-        public bool? reducedSize { get; set; }
-        public bool mux;
-    }
+    //[Serializable]
+    //public class RtpHeaderExtensionParameters
+    //{
+    //    public string uri;
+    //    public int id;
+    //    public bool? encrypt { get; set; }
+    //    public dynamic? parameters { get; set; }
+    //}
 
     [JsonConverter(typeof(StringEnumConverter))]
     public enum MediaKind
     {
-        audio,
-        video,
-        application
+        AUDIO,
+        VIDEO,
+        APPLICATION
     }
 
     [JsonConverter(typeof(StringEnumConverter))]
     public enum RtpHeaderExtensionDirection
     {
-        sendrecv,
-        sendonly,
-        recvonly,
-        inactive
+        [EnumMember(Value = "sendrecv")]
+        SendReceive,
+
+        [EnumMember(Value = "sendonly")]
+        SendOnly,
+
+        [EnumMember(Value = "recvonly")]
+        ReceiveOnly,
+
+        [EnumMember(Value = "inactive")]
+        Inactive
     }
 }

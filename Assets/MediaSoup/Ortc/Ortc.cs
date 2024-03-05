@@ -1,31 +1,29 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using UnityEngine;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
+using System.Diagnostics;
+using System.Linq;
+using System.Text.RegularExpressions;
 using Mediasoup.RtpParameter;
 using Mediasoup.SctpParameter;
-using System;
-using System.Text.RegularExpressions;
-using System.Runtime.InteropServices;
-using System.Dynamic;
-using System.Linq;
-using UnityEditor.PackageManager;
-using h264_profile_level_id;
-using System.Drawing.Text;
-using System.Security.Cryptography;
-using Unity.VisualScripting;
 
 namespace Mediasoup.Ortc
 {
-    public class Ortc
+    public static class ORTC
     {
-        static h264_profile_level_id.H264PRofileLevelId h264 = new H264PRofileLevelId();
+        private static readonly Regex MimeTypeRegex = new("^(audio|video)/(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        const string RTP_PROBATOR_MID = "probator";
-        const int RTP_PROBATOR_SSRC = 1234;
-        const int RTP_PROBATOR_CODEC_PAYLOAD_TYPE = 127;
+        private static readonly Regex RtxMimeTypeRegex = new("^.+/rtx$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+        public static readonly byte[] DynamicPayloadTypes = new byte[] {
+            100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
+            111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121,
+            122, 123, 124, 125, 126, 127, 96, 97, 98, 99 };
+
+        /// <summary>
+        /// Validates RtpCapabilities. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
         public static void ValidateRtpCapabilities(RtpCapabilities caps)
         {
             if (caps == null)
@@ -33,105 +31,93 @@ namespace Mediasoup.Ortc
                 throw new ArgumentNullException(nameof(caps));
             }
 
-            caps.codecs ??= new();
+            caps.Codecs ??= new List<RtpCodecCapability>();
 
-            foreach (var codec in caps.codecs)
+            foreach (var codec in caps.Codecs)
             {
                 ValidateRtpCodecCapability(codec);
             }
 
             // headerExtensions is optional. If unset, fill with an empty array.
-            caps.headerExtensions ??= new();
+            caps.HeaderExtensions ??= Array.Empty<RtpHeaderExtension>();
 
-            foreach (var ext in caps.headerExtensions)
+            foreach (var ext in caps.HeaderExtensions)
             {
                 ValidateRtpHeaderExtension(ext);
             }
         }
 
+        /// <summary>
+        /// Validates RtpCodecCapability. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
         public static void ValidateRtpCodecCapability(RtpCodecCapability codec)
         {
-            if (codec == null)
-            {
-                throw new ArgumentNullException(nameof(codec));
-            }
-
             // mimeType is mandatory.
-            if (string.IsNullOrEmpty(codec.mimeType))
+            if (codec.MimeType.IsNullOrWhiteSpace())
             {
-                throw new InvalidOleVariantTypeException("missing codec.mimeType");
+                throw new ArgumentException($"{nameof(codec.MimeType)} can't be null or white space.");
             }
 
-            Regex mimeTypeRegex = new Regex(@"^(audio|video)/(.+)", RegexOptions.ECMAScript | RegexOptions.IgnoreCase);
-
-            if (!mimeTypeRegex.IsMatch(codec.mimeType))
+            var mimeType = codec.MimeType.ToLower();
+            if (!MimeTypeRegex.IsMatch(mimeType))
             {
-                throw new ArgumentException("invalid codec.mimeType");
+                throw new ArgumentException($"{nameof(codec.MimeType)} is not matched.");
             }
 
-            string mimeType = mimeTypeRegex.Match(codec.mimeType).Value;
+            // Just override kind with media component in mimeType.
+            codec.Kind = mimeType.StartsWith("video") ? MediaKind.VIDEO : MediaKind.AUDIO;
 
-            // Just override kind with media component of mimeType.
-            codec.kind = mimeType == "video" ? MediaKind.video : MediaKind.audio;
-
-            // preferredPayloadType is optional, no check required
+            // preferredPayloadType is optional.
 
             // clockRate is mandatory.
-            if (codec.clockRate == null) {
-                throw new ArgumentNullException("Clock rate is missing");
-            }
 
             // channels is optional. If unset, set it to 1 (just if audio).
-            if (codec.kind == MediaKind.audio)
+            if (codec.Kind == MediaKind.AUDIO && (!codec.Channels.HasValue || codec.Channels < 1))
             {
-                if (codec.channels == null) {
-                    codec.channels = 1;
-                }
-            }
-            else { 
-                codec.channels = null;
+                codec.Channels = 1;
             }
 
             // parameters is optional. If unset, set it to an empty object.
-            if (codec.parameters == null)
-                codec.parameters = new Dictionary<string, string>();
+            codec.Parameters ??= new Dictionary<string, object>();
 
-            foreach (var (key, val) in codec.parameters)
+            foreach (var item in codec.Parameters)
             {
-                var value = val;
-
+                var key = item.Key;
+                var value = item.Value;
                 if (value == null)
                 {
-                    codec.parameters[key] = string.Empty;
-                    value = string.Empty;
+                    codec.Parameters[item.Key] = "";
+                    value = "";
                 }
 
-                if (value is not (string or uint or int or ulong or long or byte or sbyte))
+                if (!value.IsStringType() && !value.IsNumericType())
                 {
-                    throw new InvalidOleVariantTypeException($"invalid codec parameter [key:{key}, value:{value}]");
+                    throw new ArgumentOutOfRangeException($"invalid codec parameter [key:{key}, value:{value}]");
                 }
 
                 // Specific parameters validation.
-                if (key == "apt")
+                if (key == "apt" && !value.IsNumericType())
                 {
-                    if (value is not string)
-                    {
-                        throw new InvalidOleVariantTypeException("invalid codec apt parameter");
-                    }
+                    throw new ArgumentOutOfRangeException($"invalid codec apt parameter [key:{key}]");
                 }
             }
 
             // rtcpFeedback is optional. If unset, set it to an empty array.
-            codec.rtcpFeedback ??= new();
+            codec.RtcpFeedback ??= new List<RtcpFeedback>(0);
 
-            foreach (var fb in codec.rtcpFeedback)
+            foreach (var fb in codec.RtcpFeedback)
             {
                 ValidateRtcpFeedback(fb);
             }
-
-
         }
 
+        /// <summary>
+        /// Validates RtcpFeedback. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
         public static void ValidateRtcpFeedback(RtcpFeedback fb)
         {
             if (fb == null)
@@ -140,19 +126,23 @@ namespace Mediasoup.Ortc
             }
 
             // type is mandatory.
-            if (string.IsNullOrEmpty(fb.type))
+            if (fb.Type.IsNullOrWhiteSpace())
             {
-                throw new InvalidOleVariantTypeException("missing fb.type");
+                throw new ArgumentException(nameof(fb.Type));
             }
 
             // parameter is optional. If unset set it to an empty string.
-            if (string.IsNullOrEmpty(fb.parameters))
+            if (fb.Parameter.IsNullOrWhiteSpace())
             {
-                fb.parameters = string.Empty;
+                fb.Parameter = "";
             }
-
         }
 
+        /// <summary>
+        /// Validates RtpHeaderExtension. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
         public static void ValidateRtpHeaderExtension(RtpHeaderExtension ext)
         {
             if (ext == null)
@@ -160,135 +150,144 @@ namespace Mediasoup.Ortc
                 throw new ArgumentNullException(nameof(ext));
             }
 
+
             // uri is mandatory.
-            if (string.IsNullOrEmpty(ext.uri))
-            {
-                throw new InvalidOleVariantTypeException($"missing ext.uri");
-            }
+            // if(ext.Uri.IsNullOrWhiteSpace())
+            // {
+            //     throw new ArgumentException($"{nameof(ext.Uri)} can't be null or white space.");
+            // }
+
+            // preferredId is mandatory.
 
             // preferredEncrypt is optional. If unset set it to false.
-            ext.preferredEncrypt ??= false;
+            // if(!ext.PreferredEncrypt.HasValue)
+            // {
+            //     ext.PreferredEncrypt = false;
+            // }
 
             // direction is optional. If unset set it to sendrecv.
-            ext.direction ??= RtpHeaderExtensionDirection.sendrecv;
-
-
+            if (!ext.Direction.HasValue)
+            {
+                ext.Direction = RtpHeaderExtensionDirection.SendReceive;
+            }
         }
 
-        public static void ValidateRtpParameters(RtpParameters param)
+        /// <summary>
+        /// Validates RtpParameters. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
+        public static void ValidateRtpParameters(RtpParameters parameters)
         {
-            if (param == null)
+            if (parameters == null)
             {
-                throw new InvalidOleVariantTypeException("params is not an object");
+                throw new ArgumentNullException(nameof(parameters));
             }
             // mid is optional.
 
             // codecs is mandatory.
-            if (param.codecs == null)
+            if (parameters.Codecs == null)
             {
-                throw new InvalidOleVariantTypeException("missing params.codecs");
+                throw new ArgumentNullException($"{nameof(parameters)}.Codecs");
             }
 
-            foreach (var codec in param.codecs)
+            foreach (var codec in parameters.Codecs)
             {
                 ValidateRtpCodecParameters(codec);
             }
 
             // headerExtensions is optional. If unset, fill with an empty array.
-            param.headerExtensions ??= new();
+            parameters.HeaderExtensions ??= new List<RtpHeaderExtensionParameters>();
 
-            foreach (var ext in param.headerExtensions)
+            foreach (var ext in parameters.HeaderExtensions)
             {
                 ValidateRtpHeaderExtensionParameters(ext);
             }
 
             // encodings is optional. If unset, fill with an empty array.
-            param.encodings ??= new();
+            // parameters.Encodings ??= new List<RtpEncodingParameters>();
 
-            foreach (var encoding in param.encodings)
+            foreach (var encoding in parameters.Encodings)
             {
                 ValidateRtpEncodingParameters(encoding);
             }
 
             // rtcp is optional. If unset, fill with an empty object.
-            param.rtcpParameters ??= new RtcpParameters();
-            ValidateRtcpParameters(param.rtcpParameters);
+            // parameters.Rtcp ??= new RtcpParameters();
+            ValidateRtcpParameters(parameters.Rtcp);
         }
 
+        /// <summary>
+        /// Validates RtpCodecParameters. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
         public static void ValidateRtpCodecParameters(RtpCodecParameters codec)
         {
             if (codec == null)
             {
-                throw new InvalidOleVariantTypeException("codec is not an object");
+                throw new ArgumentNullException(nameof(codec));
             }
 
             // mimeType is mandatory.
-            if (string.IsNullOrEmpty(codec.mimeType))
+            if (codec.MimeType.IsNullOrWhiteSpace())
             {
-                throw new InvalidOleVariantTypeException("missing codec.mimeType");
+                throw new ArgumentException($"{nameof(codec.MimeType)} can't be null or white space.");
             }
 
-            Regex mimeTypeRegex = new Regex(@"^(audio|video)/(.+)", RegexOptions.ECMAScript | RegexOptions.IgnoreCase);
-
-            var mimeTypeMatch = mimeTypeRegex.Matches(codec.mimeType);
-
-            if (mimeTypeMatch.Count == 0)
+            var mimeType = codec.MimeType.ToLower();
+            if (!MimeTypeRegex.IsMatch(mimeType))
             {
-                throw new ArgumentException("invalid codec.mimeType");
+                throw new ArgumentException($"{nameof(codec.MimeType)} is not matched.");
             }
 
-            var kind = mimeTypeMatch[1].Value.ToLower().StartsWith("audio")
-                ? MediaKind.audio
-                : MediaKind.video;
+            // payloadType is mandatory.
+
+            // clockRate is mandatory.
 
             // channels is optional. If unset, set it to 1 (just if audio).
-
-            if (kind is MediaKind.audio)
+            if (mimeType.StartsWith("audio") && (!codec.Channels.HasValue || codec.Channels < 1))
             {
-                codec.channels = 1;
-            }
-            else
-            {
-                codec.channels = -1;
+                codec.Channels = 1;
             }
 
             // parameters is optional. If unset, set it to an empty object.
-            codec.parameters ??= new Dictionary<string, string>();
+            codec.Parameters ??= new Dictionary<string, object>();
 
-            foreach (var (key, _) in codec.parameters)
+            foreach (var item in codec.Parameters)
             {
-                object? value = codec.parameters[key];
-
+                var key = item.Key;
+                var value = item.Value;
                 if (value == null)
                 {
-                    codec.parameters[key] = string.Empty;
-                    value = string.Empty;
+                    codec.Parameters[item.Key] = "";
+                    value = "";
                 }
 
-                if (value is not (string or uint or int or ulong or long or byte or sbyte))
+                if (!value.IsStringType() && !value.IsNumericType())
                 {
-                    throw new InvalidOleVariantTypeException($"invalid codec parameter[key:{key}, value:{value}]");
+                    throw new ArgumentOutOfRangeException($"invalid codec parameter [key:{key}, value:{value}]");
                 }
 
-                // Specific parameters validation.
-                if (key == "apt")
+                if (key == "apt" && !value.IsNumericType())
                 {
-                    if (value is not (uint or int or ulong or long or byte or sbyte))
-                    {
-                        throw new InvalidOleVariantTypeException("invalid codec apt parameter");
-                    }
+                    throw new ArgumentOutOfRangeException($"invalid codec apt parameter [key:{key}]");
                 }
             }
 
             // rtcpFeedback is optional. If unset, set it to an empty array.
-            codec.rtcpFeedback ??= new();
+            // codec.RtcpFeedback ??= new List<RtcpFeedback>(0);
 
-            foreach (var fb in codec.rtcpFeedback)
+            foreach (var fb in codec.RtcpFeedback)
             {
                 ValidateRtcpFeedback(fb);
             }
         }
 
+        /// <summary>
+        /// Validates RtpHeaderExtensionParameteters. It may modify given data by adding
+        /// missing fields with default values. It throws if invalid.
+        /// </summary>
         public static void ValidateRtpHeaderExtensionParameters(RtpHeaderExtensionParameters ext)
         {
             if (ext == null)
@@ -297,35 +296,45 @@ namespace Mediasoup.Ortc
             }
 
             // uri is mandatory.
-            if (string.IsNullOrEmpty(ext.uri))
-            {
-                throw new InvalidOleVariantTypeException($"missing ext.uri");
-            }
+            // if(ext.Uri.IsNullOrWhiteSpace())
+            // {
+            //     throw new ArgumentException($"{nameof(ext.Uri)} can't be null or white space.");
+            // }
 
+            // id is mandatory.
 
             // encrypt is optional. If unset set it to false.
-            ext.encrypt ??= false;
+            // if(!ext.Encrypt.HasValue)
+            // {
+            //     ext.Encrypt = false;
+            // }
 
             // parameters is optional. If unset, set it to an empty object.
-            ext.parameters ??= new ExpandoObject();
+            ext.Parameters ??= new Dictionary<string, object>();
 
-            foreach (var (key, _) in (ext.parameters as ExpandoObject)!)
+            foreach (var item in ext.Parameters)
             {
-                var value = ext.parameters[key];
+                var key = item.Key;
+                var value = item.Value;
 
                 if (value == null)
                 {
-                    ext.parameters[key] = string.Empty;
-                    value = string.Empty;
+                    ext.Parameters[item.Key] = "";
+                    value = "";
                 }
 
-                if (value is not (uint or int or ulong or long or byte or sbyte))
+                if (!value.IsStringType() && !value.IsNumericType())
                 {
-                    throw new InvalidOleVariantTypeException($"invalid codec parameter[key:{key}, value:{value}]");
+                    throw new ArgumentOutOfRangeException($"invalid codec parameter[key:{key}, value:{value}]");
                 }
             }
         }
 
+        /// <summary>
+        /// Validates RtpEncodingParameters. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
         public static void ValidateRtpEncodingParameters(RtpEncodingParameters encoding)
         {
             if (encoding == null)
@@ -333,28 +342,51 @@ namespace Mediasoup.Ortc
                 throw new ArgumentNullException(nameof(encoding));
             }
 
+            // ssrc is optional.
+
+            // rid is optional.
+
+            // rtx is optional.
+            if (encoding.Rtx != null)
+            {
+                // RTX ssrc is mandatory if rtx is present.
+            }
+
             // dtx is optional. If unset set it to false.
-            encoding.dtx ??= false;
+            // if(!encoding.Dtx.HasValue)
+            // {
+            //     encoding.Dtx = false;
+            // }
+
+            // scalabilityMode is optional.
         }
 
         /// <summary>
-        ///     Validates Rtcp Parameters
+        /// Validates RtcpParameters. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
         /// </summary>
-        /// <param name="rtcp"></param>
-        /// <exception cref="ArgumentNullException"></exception>
-        public static void ValidateRtcpParameters(RtcpParameters rtcpParameters)
+        public static void ValidateRtcpParameters(RtcpParameters rtcp)
         {
-            if (rtcpParameters == null)
+            if (rtcp == null)
             {
-                throw new ArgumentNullException(nameof(rtcpParameters));
+                throw new ArgumentNullException(nameof(rtcp));
             }
 
-            // cname is optional
+            // cname is optional.
 
             // reducedSize is optional. If unset set it to true.
-            rtcpParameters.reducedSize ??= true;
+            // if(!rtcp.ReducedSize.HasValue)
+            // {
+            //     rtcp.ReducedSize = true;
+            // }
         }
 
+        /// <summary>
+        /// Validates SctpCapabilities. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
         public static void ValidateSctpCapabilities(SctpCapabilities caps)
         {
             if (caps == null)
@@ -365,569 +397,772 @@ namespace Mediasoup.Ortc
             // numStreams is mandatory.
             if (caps.numStreams == null)
             {
-                throw new InvalidOleVariantTypeException("missing caps.numStreams");
+                throw new ArgumentNullException($"{nameof(caps)}.NumStreams");
             }
 
             ValidateNumSctpStreams(caps.numStreams);
         }
 
-        public static void ValidateNumSctpStreams(NumSctpStreams numStreams)
+        /// <summary>
+        /// Validates NumSctpStreams. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
+        public static void ValidateNumSctpStreams(NumSctpStreams _/*numStreams*/)
         {
-            if (numStreams == null)
-            {
-                throw new ArgumentNullException(nameof(numStreams));
-            }
+            // OS is mandatory.
+
+            // MIS is mandatory.
         }
 
-        public static void ValidateSctpParameters(SctpParameters param)
+        /// <summary>
+        /// Validates SctpParameters. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
+        public static void ValidateSctpParameters(SctpParameters _/*parameters*/)
         {
-            if (param == null)
-            {
-                throw new ArgumentNullException(nameof(param));
-            }
+            // port is mandatory.
+
+            // OS is mandatory.
+
+            // MIS is mandatory.
+
+            // maxMessageSize is mandatory.
         }
 
-        public static void ValidateSctpStreamParameters(SctpStreamParameters param)
+        /// <summary>
+        /// Validates SctpStreamParameters. It may modify given data by adding missing
+        /// fields with default values.
+        /// It throws if invalid.
+        /// </summary>
+        public static void ValidateSctpStreamParameters(SctpStreamParameters parameters)
         {
-            if (param == null)
+            if (parameters == null)
             {
-                throw new ArgumentNullException(nameof(param));
+                throw new ArgumentNullException(nameof(parameters));
             }
+
+            // streamId is mandatory.
 
             // ordered is optional.
-            var orderedGiven = false;
-
-            if (param.ordered.HasValue)
+            var orderedGiven = true;
+            if (!parameters.ordered.HasValue)
             {
-                orderedGiven = true;
+                orderedGiven = false;
+                parameters.ordered = true;
+            }
+
+            // maxPacketLifeTime is optional.
+
+            // maxRetransmits is optional.
+
+            if (parameters.maxPacketLifeTime.HasValue && parameters.maxRetransmits.HasValue)
+            {
+                throw new ArgumentException("cannot provide both maxPacketLifeTime and maxRetransmits");
+            }
+
+            if (orderedGiven &&
+                parameters.ordered.Value &&
+                (parameters.maxPacketLifeTime.HasValue || parameters.maxRetransmits.HasValue)
+                )
+            {
+                throw new ArgumentException("cannot be ordered with maxPacketLifeTime or maxRetransmits");
+            }
+            else if (!orderedGiven && (parameters.maxPacketLifeTime.HasValue || parameters.maxRetransmits.HasValue))
+            {
+                parameters.ordered = false;
+            }
+        }
+
+        /// <summary>
+        /// Generate RTP capabilities for the Router based on the given media codecs and
+        /// mediasoup supported RTP capabilities.
+        /// </summary>
+        public static RtpCapabilities GenerateRouterRtpCapabilities(RtpCodecCapability[] mediaCodecs)
+        {
+            if (mediaCodecs == null)
+            {
+                throw new ArgumentNullException(nameof(mediaCodecs));
+            }
+
+            // Normalize supported RTP capabilities.
+            ValidateRtpCapabilities(RtpCapabilities.SupportedRtpCapabilities);
+
+            var clonedSupportedRtpCapabilities = RtpCapabilities.SupportedRtpCapabilities.DeepClone();
+            var dynamicPayloadTypes = DynamicPayloadTypes.DeepClone().ToList();
+            var caps = new RtpCapabilities
+            {
+                Codecs = new List<RtpCodecCapability>(),
+                HeaderExtensions = clonedSupportedRtpCapabilities.HeaderExtensions
+            };
+
+            foreach (var mediaCodec in mediaCodecs)
+            {
+                // This may throw.
+                ValidateRtpCodecCapability(mediaCodec);
+
+                var matchedSupportedCodec = clonedSupportedRtpCapabilities
+                    .Codecs!
+                    .FirstOrDefault(supportedCodec => MatchCodecs(mediaCodec, supportedCodec, false))
+                    ?? throw new Exception($"media codec not supported[mimeType:{mediaCodec.MimeType}]");
+
+                // Clone the supported codec.
+                var codec = matchedSupportedCodec.DeepClone();
+
+                // If the given media codec has preferredPayloadType, keep it.
+                if (mediaCodec.PreferredPayloadType.HasValue)
+                {
+                    codec.PreferredPayloadType = mediaCodec.PreferredPayloadType;
+
+                    // Also remove the pt from the list in available dynamic values.
+                    dynamicPayloadTypes.Remove(codec.PreferredPayloadType.Value);
+                }
+                // Otherwise if the supported codec has preferredPayloadType, use it.
+                else if (codec.PreferredPayloadType.HasValue)
+                {
+                    // No need to remove it from the list since it's not a dynamic value.
+                }
+                // Otherwise choose a dynamic one.
+                else
+                {
+                    // Take the first available pt and remove it from the list.
+                    var pt = dynamicPayloadTypes.FirstOrDefault();
+
+                    if (pt == 0)
+                    {
+                        throw new Exception("cannot allocate more dynamic codec payload types");
+                    }
+
+                    dynamicPayloadTypes.RemoveAt(0);
+
+                    codec.PreferredPayloadType = pt;
+                }
+
+                // Ensure there is not duplicated preferredPayloadType values.
+                if (caps.Codecs.Any(c => c.PreferredPayloadType == codec.PreferredPayloadType))
+                {
+                    throw new Exception("duplicated codec.preferredPayloadType");
+                }
+
+                // Merge the media codec parameters.
+                codec.Parameters = codec.Parameters!.Merge(mediaCodec.Parameters!);
+
+                // Append to the codec list.
+                caps.Codecs.Add(codec);
+
+                // Add a RTX video codec if video.
+                if (codec.Kind == MediaKind.VIDEO)
+                {
+                    // Take the first available pt and remove it from the list.
+                    var pt = dynamicPayloadTypes.FirstOrDefault();
+
+                    if (pt == 0)
+                    {
+                        throw new Exception("cannot allocate more dynamic codec payload types");
+                    }
+
+                    dynamicPayloadTypes.RemoveAt(0);
+
+                    var rtxCodec = new RtpCodecCapability
+                    {
+                        Kind = codec.Kind,
+                        MimeType = $"{codec.Kind.GetEnumMemberValue()}/rtx",
+                        PreferredPayloadType = pt,
+                        ClockRate = codec.ClockRate,
+                        Parameters = new Dictionary<string, object>
+                        {
+                            { "apt", codec.PreferredPayloadType}
+                        },
+                        RtcpFeedback = new List<RtcpFeedback>(0),
+                    };
+
+                    // Append to the codec list.
+                    caps.Codecs.Add(rtxCodec);
+                }
+            }
+
+            return caps;
+        }
+
+        /// <summary>
+        /// <para>
+        /// Get a mapping in codec payloads and encodings in the given Producer RTP
+        /// parameters as values expected by the Router.
+        /// </para>
+        /// <para>It may throw if invalid or non supported RTP parameters are given.</para>
+        /// </summary>
+        public static RtpMapping GetProducerRtpParametersMapping(RtpParameters parameters, RtpCapabilities caps)
+        {
+            var rtpMapping = new RtpMapping
+            {
+                Codecs = new List<RtpMappingCodec>(),
+                Encodings = new List<RtpMappingEncoding>()
+            };
+
+            // Match parameters media codecs to capabilities media codecs.
+            var codecToCapCodec = new Dictionary<RtpCodecParameters, RtpCodecCapability>();
+
+            foreach (var codec in parameters.Codecs)
+            {
+                if (IsRtxMimeType(codec.MimeType))
+                {
+                    continue;
+                }
+
+                // Search for the same media codec in capabilities.
+                var matchedCapCodec = caps.Codecs!
+                    .FirstOrDefault(capCodec => MatchCodecs(codec, capCodec, true, true));
+                codecToCapCodec[codec] = matchedCapCodec ?? throw new NotSupportedException($"Unsupported codec[mimeType:{codec.MimeType}, payloadType:{codec.PayloadType}, Channels:{codec.Channels}]");
+            }
+
+            // Match parameters RTX codecs to capabilities RTX codecs.
+            foreach (var codec in parameters.Codecs)
+            {
+                if (!IsRtxMimeType(codec.MimeType))
+                {
+                    continue;
+                }
+
+                // Search for the associated media codec.
+                var associatedMediaCodec = parameters.Codecs
+                    .FirstOrDefault(mediaCodec => MatchCodecsWithPayloadTypeAndApt(mediaCodec.PayloadType, codec.Parameters!))
+                    ?? throw new Exception($"missing media codec found for RTX PT {codec.PayloadType}");
+
+                var capMediaCodec = codecToCapCodec[associatedMediaCodec];
+
+                // Ensure that the capabilities media codec has a RTX codec.
+                var associatedCapRtxCodec = caps.Codecs!
+                    .FirstOrDefault(capCodec => IsRtxMimeType(capCodec.MimeType) && MatchCodecsWithPayloadTypeAndApt(capMediaCodec.PreferredPayloadType, capCodec.Parameters!));
+                codecToCapCodec[codec] = associatedCapRtxCodec ?? throw new Exception($"no RTX codec for capability codec PT {capMediaCodec.PreferredPayloadType}");
+            }
+
+            // Generate codecs mapping.
+            foreach (var item in codecToCapCodec)
+            {
+                rtpMapping.Codecs.Add(new RtpMappingCodec
+                {
+                    PayloadType = item.Key.PayloadType,
+                    MappedPayloadType = item.Value.PreferredPayloadType!.Value,
+                });
+            }
+
+            // Generate encodings mapping.
+            uint mappedSsrc = Utils.GenerateRandomNumber();
+
+            foreach (var encoding in parameters.Encodings)
+            {
+                var mappedEncoding = new RtpMappingEncoding
+                {
+                    MappedSsrc = mappedSsrc++,
+                    Rid = encoding.Rid,
+                    Ssrc = encoding.Ssrc,
+                    ScalabilityMode = encoding.ScalabilityMode,
+                };
+
+                rtpMapping.Encodings.Add(mappedEncoding);
+            }
+
+            return rtpMapping;
+        }
+
+        /// <summary>
+        /// Generate RTP parameters to be internally used by Consumers given the RTP
+        /// parameters in a Producer and the RTP capabilities in the Router.
+        /// </summary>
+        public static RtpParameters GetConsumableRtpParameters(MediaKind kind, RtpParameters parameters, RtpCapabilities caps, RtpMapping rtpMapping)
+        {
+            var consumableParams = new RtpParameters
+            {
+                Codecs = new List<RtpCodecParameters>(),
+                HeaderExtensions = new List<RtpHeaderExtensionParameters>(),
+                Encodings = new List<RtpEncodingParameters>(),
+                Rtcp = new RtcpParameters(),
+            };
+
+            foreach (var codec in parameters.Codecs)
+            {
+                if (IsRtxMimeType(codec.MimeType))
+                {
+                    continue;
+                }
+
+                var consumableCodecPt = rtpMapping.Codecs
+                    .Where(entry => entry.PayloadType == codec.PayloadType)
+                    .Select(m => m.MappedPayloadType)
+                    .FirstOrDefault();
+
+                var matchedCapCodec = caps.Codecs!
+                    .FirstOrDefault(capCodec => capCodec.PreferredPayloadType == consumableCodecPt);
+
+                var consumableCodec = new RtpCodecParameters
+                {
+                    MimeType = matchedCapCodec!.MimeType,
+                    PayloadType = matchedCapCodec.PreferredPayloadType!.Value,
+                    ClockRate = matchedCapCodec.ClockRate,
+                    Channels = matchedCapCodec.Channels,
+                    Parameters = codec.Parameters, // Keep the Producer codec parameters.
+                    RtcpFeedback = matchedCapCodec.RtcpFeedback
+                };
+
+                consumableParams.Codecs.Add(consumableCodec);
+
+                var consumableCapRtxCodec = caps.Codecs!
+                    .FirstOrDefault(capRtxCodec => IsRtxMimeType(capRtxCodec.MimeType) && MatchCodecsWithPayloadTypeAndApt(consumableCodec.PayloadType, capRtxCodec.Parameters!));
+
+                if (consumableCapRtxCodec != null)
+                {
+                    var consumableRtxCodec = new RtpCodecParameters
+                    {
+                        MimeType = consumableCapRtxCodec.MimeType,
+                        PayloadType = consumableCapRtxCodec.PreferredPayloadType!.Value,
+                        ClockRate = consumableCapRtxCodec.ClockRate,
+                        Channels = consumableCapRtxCodec.Channels,
+                        Parameters = consumableCapRtxCodec.Parameters, // Keep the Producer codec parameters.
+                        RtcpFeedback = consumableCapRtxCodec.RtcpFeedback
+                    };
+
+                    consumableParams.Codecs.Add(consumableRtxCodec);
+                }
+            }
+
+            foreach (var capExt in caps.HeaderExtensions!)
+            {
+                // Just take RTP header extension that can be used in Consumers.
+                if (capExt.Kind != kind || (capExt.Direction != RtpHeaderExtensionDirection.SendReceive && capExt.Direction != RtpHeaderExtensionDirection.SendOnly))
+                {
+                    continue;
+                }
+
+                var consumableExt = new RtpHeaderExtensionParameters
+                {
+                    Uri = capExt.Uri,
+                    Id = capExt.PreferredId,
+                    Encrypt = capExt.PreferredEncrypt,
+                    Parameters = new Dictionary<string, object>(),
+                };
+
+                consumableParams.HeaderExtensions.Add(consumableExt);
+            }
+
+            // Clone Producer encodings since we'll mangle them.
+            var consumableEncodings = parameters.Encodings!.DeepClone();
+
+            for (var i = 0; i < consumableEncodings.Count; ++i)
+            {
+                var consumableEncoding = consumableEncodings[i];
+                var mappedSsrc = rtpMapping.Encodings[i].MappedSsrc;
+
+                // Remove useless fields.
+                // 在 Node.js 实现中，rid, rtx, codecPayloadType 被 delete 了。
+                consumableEncoding.Rid = null;
+                consumableEncoding.Rtx = null;
+                consumableEncoding.CodecPayloadType = null;
+
+                // Set the mapped ssrc.
+                consumableEncoding.Ssrc = mappedSsrc;
+
+                consumableParams.Encodings.Add(consumableEncoding);
+            }
+
+            consumableParams.Rtcp = new RtcpParameters
+            {
+                CNAME = parameters.Rtcp!.CNAME,
+                ReducedSize = true,
+            };
+
+            return consumableParams;
+        }
+
+        /// <summary>
+        /// Check whether the given RTP capabilities can consume the given Producer.
+        /// </summary>
+        public static bool CanConsume(RtpParameters consumableParams, RtpCapabilities caps)
+        {
+            // This may throw.
+            ValidateRtpCapabilities(caps);
+
+            var matchingCodecs = new List<RtpCodecParameters>();
+
+            foreach (var codec in consumableParams.Codecs)
+            {
+                var matchedCapCodec = caps.Codecs!
+                    .FirstOrDefault(capCodec => MatchCodecs(capCodec, codec, true));
+
+                if (matchedCapCodec == null)
+                {
+                    continue;
+                }
+
+                matchingCodecs.Add(codec);
+            }
+
+            // Ensure there is at least one media codec.
+            return matchingCodecs.Count != 0 && !IsRtxMimeType(matchingCodecs[0].MimeType);
+        }
+
+        /// <summary>
+        /// <para>Generate RTP parameters for a specific Consumer.</para>
+        /// <para>
+        /// It reduces encodings to just one and takes into account given RTP capabilities
+        /// to reduce codecs, codecs' RTCP feedback and header extensions, and also enables
+        /// or disabled RTX.
+        /// </para>
+        /// </summary>
+        public static RtpParameters GetConsumerRtpParameters(RtpParameters consumableParams, RtpCapabilities caps, bool pipe)
+        {
+            var consumerParams = new RtpParameters
+            {
+                Codecs = new List<RtpCodecParameters>(),
+                HeaderExtensions = new List<RtpHeaderExtensionParameters>(),
+                Encodings = new List<RtpEncodingParameters>(),
+                Rtcp = consumableParams.Rtcp
+            };
+
+            foreach (var capCodec in caps.Codecs!)
+            {
+                ValidateRtpCodecCapability(capCodec);
+            }
+
+            var consumableCodecs = consumableParams.Codecs.DeepClone();
+
+            var rtxSupported = false;
+
+            foreach (var codec in consumableCodecs)
+            {
+                var matchedCapCodec = caps.Codecs
+                    .FirstOrDefault(capCodec => MatchCodecs(capCodec, codec, true));
+
+                if (matchedCapCodec == null)
+                {
+                    continue;
+                }
+
+                codec.RtcpFeedback = matchedCapCodec.RtcpFeedback;
+
+                consumerParams.Codecs.Add(codec);
+            }
+
+            // Must sanitize the list of matched codecs by removing useless RTX codecs.
+            var codecsToRemove = new List<RtpCodecParameters>();
+            foreach (var codec in consumerParams.Codecs)
+            {
+                if (IsRtxMimeType(codec.MimeType))
+                {
+                    if (!codec.Parameters!.TryGetValue("apt", out var apt))
+                    {
+                        throw new Exception("\"apt\" key is not exists.");
+                    }
+
+                    var apiInteger = 0;
+                    apiInteger = Convert.ToInt32(apt);
+
+                    // Search for the associated media codec.
+                    var associatedMediaCodec = consumerParams.Codecs.FirstOrDefault(mediaCodec => mediaCodec.PayloadType == apiInteger);
+                    if (associatedMediaCodec != null)
+                    {
+                        rtxSupported = true;
+                    }
+                    else
+                    {
+                        codecsToRemove.Add(codec);
+                    }
+                }
+            }
+
+            codecsToRemove.ForEach(m => consumerParams.Codecs.Remove(m));
+
+            // Ensure there is at least one media codec.
+            if (consumerParams.Codecs.Count == 0 || IsRtxMimeType(consumerParams.Codecs[0].MimeType))
+            {
+                throw new Exception("no compatible media codecs");
+            }
+
+            consumerParams.HeaderExtensions = consumableParams.HeaderExtensions!
+                .Where(ext =>
+                    caps.HeaderExtensions!
+                        .Any(capExt => capExt.PreferredId == ext.Id && capExt.Uri == ext.Uri)
+                ).ToList();
+
+            // Reduce codecs' RTCP feedback. Use Transport-CC if available, REMB otherwise.
+            if (consumerParams.HeaderExtensions.Any(ext => ext.Uri == RtpHeaderExtensionUri.TransportWideCcDraft01))
+            {
+                foreach (var codec in consumerParams.Codecs)
+                {
+                    codec.RtcpFeedback = codec.RtcpFeedback.Where(fb => fb.Type != "goog-remb").ToList();
+                }
+            }
+            else if (consumerParams.HeaderExtensions.Any(ext => ext.Uri == RtpHeaderExtensionUri.AbsSendTime))
+            {
+                foreach (var codec in consumerParams.Codecs)
+                {
+                    codec.RtcpFeedback = codec.RtcpFeedback.Where(fb => fb.Type != "transport-cc").ToList();
+                }
             }
             else
             {
-                param.ordered = true;
+                foreach (var codec in consumerParams.Codecs)
+                {
+                    codec.RtcpFeedback = codec.RtcpFeedback.Where(fb => fb.Type is not "transport-cc" and not "goog-remb").ToList();
+                }
             }
 
-
-            if (param is { maxPacketLifeTime: not null, maxRetransmits: not null })
+            if (!pipe)
             {
-                throw new InvalidOleVariantTypeException("cannot provide both maxPacketLifeTime and maxRetransmits");
+                var consumerEncoding = new RtpEncodingParameters
+                {
+                    Ssrc = Utils.GenerateRandomNumber()
+                };
+
+                if (rtxSupported)
+                {
+                    consumerEncoding.Rtx = new Rtx { Ssrc = consumerEncoding.Ssrc.Value + 1 };
+                }
+
+                // If any in the consumableParams.Encodings has scalabilityMode, process it
+                // (assume all encodings have the same value).
+                var encodingWithScalabilityMode = consumableParams.Encodings.FirstOrDefault(encoding => !encoding.ScalabilityMode.IsNullOrWhiteSpace());
+
+                var scalabilityMode = encodingWithScalabilityMode?.ScalabilityMode;
+
+                // If there is simulast, mangle spatial layers in scalabilityMode.
+                if (consumableParams.Encodings.Count > 1)
+                {
+                    var scalabilityModeObject = ScalabilityMode.Parse(scalabilityMode!);
+
+                    scalabilityMode = $"S{consumableParams.Encodings.Count}T{scalabilityModeObject.TemporalLayers}";
+                }
+
+                if (!scalabilityMode.IsNullOrWhiteSpace())
+                {
+                    consumerEncoding.ScalabilityMode = scalabilityMode;
+                }
+
+                // Use the maximum maxBitrate in any encoding and honor it in the Consumer's
+                // encoding.
+                var maxEncodingMaxBitrate = consumableParams.Encodings.Max(m => m.MaxBitrate);
+                if (maxEncodingMaxBitrate > 0)
+                {
+                    consumerEncoding.MaxBitrate = maxEncodingMaxBitrate;
+                }
+
+                // Set a single encoding for the Consumer.
+                consumerParams.Encodings.Add(consumerEncoding);
+            }
+            else
+            {
+                var consumableEncodings = consumableParams.Encodings.DeepClone();
+                var baseSsrc = Utils.GenerateRandomNumber();
+                var baseRtxSsrc = Utils.GenerateRandomNumber();
+
+                for (var i = 0; i < consumableEncodings!.Count; ++i)
+                {
+                    var encoding = consumableEncodings[i];
+                    encoding.Ssrc = baseSsrc + (uint)i;
+                    encoding.Rtx = rtxSupported ? new Rtx { Ssrc = baseRtxSsrc + (uint)i } : null;
+
+                    consumerParams.Encodings.Add(encoding);
+                }
             }
 
-            param.ordered = orderedGiven switch
+            return consumerParams;
+        }
+
+        /// <summary>
+        /// <para>Generate RTP parameters for a pipe Consumer.</para>
+        /// <para>
+        /// It keeps all original consumable encodings and removes support for BWE. If
+        /// enableRtx is false, it also removes RTX and NACK support.
+        /// </para>
+        /// </summary>
+        public static RtpParameters GetPipeConsumerRtpParameters(RtpParameters consumableParams, bool enableRtx = false)
+        {
+            var consumerParams = new RtpParameters
             {
-                true when param.ordered.Value &&
-                          (param.maxPacketLifeTime.HasValue || param.maxRetransmits.HasValue) =>
-                    throw new InvalidOleVariantTypeException("cannot be ordered with maxPacketLifeTime or maxRetransmits"),
-                false when param.maxPacketLifeTime.HasValue || param.maxRetransmits.HasValue
-                    => false,
-                _ => param.ordered
+                Codecs = new List<RtpCodecParameters>(),
+                HeaderExtensions = new List<RtpHeaderExtensionParameters>(),
+                Encodings = new List<RtpEncodingParameters>(),
+                Rtcp = consumableParams.Rtcp
             };
-        }
 
-        public static ExtendedRtpCapabilities GetExtendedRtpCapabilities(RtpCapabilities localCaps, RtpCapabilities remoteCaps)
-        {
-            ExtendedRtpCapabilities extendedRtpCapabilities = new ExtendedRtpCapabilities();
+            var consumableCodecs = consumableParams.Codecs.DeepClone();
 
-            foreach (RtpCodecCapability remoteCodec in remoteCaps.codecs)
+            foreach (var codec in consumableCodecs)
             {
-                if (IsRtxCodec(remoteCodec))
+                if (!enableRtx && IsRtxMimeType(codec.MimeType))
                 {
                     continue;
                 }
 
-                RtpCodecCapability matchingLocalCodec = null;
-                if (localCaps.codecs != null)
-                {
-                    foreach (RtpCodecCapability localCodec in localCaps.codecs)
-                    {
-                        if (MatchCodecs(localCodec, remoteCodec, true, true))
-                        {
-                            matchingLocalCodec = localCodec;
-                            break;
-                        }
-                    }
-                }
+                codec.RtcpFeedback = codec.RtcpFeedback
+                    .Where(fb =>
+                        (fb.Type == "nack" && fb.Parameter == "pli") ||
+                        (fb.Type == "ccm" && fb.Parameter == "fir") ||
+                        (enableRtx && fb.Type == "nack" && fb.Parameter.IsNullOrWhiteSpace())
+                    ).ToList();
 
-                if (matchingLocalCodec == null)
-                {
-                    continue;
-                }
-
-                ExtendedRtpCodecCapability extendedCodec = new ExtendedRtpCodecCapability
-                {
-                    mimeType = matchingLocalCodec.mimeType,
-                    kind = matchingLocalCodec.kind.Value,
-                    clockRate = matchingLocalCodec.clockRate,
-                    channels = matchingLocalCodec.channels,
-                    localPayloadType = matchingLocalCodec.preferredPayloadType,
-                    remotePayloadType = remoteCodec.preferredPayloadType,
-                    localParameters = matchingLocalCodec.parameters,
-                    remoteParameters = remoteCodec.parameters,
-                    rtcpFeedback = ReduceRtcpFeedback(matchingLocalCodec, remoteCodec),
-                };
-
-                extendedRtpCapabilities.codecs.Add(extendedCodec);
+                consumerParams.Codecs.Add(codec);
             }
 
-            foreach (ExtendedRtpCodecCapability extendedCodec in extendedRtpCapabilities.codecs)
+            // Reduce RTP extensions by disabling transport MID and BWE related ones.
+            consumerParams.HeaderExtensions = consumableParams.HeaderExtensions!
+                .Where(ext => ext.Uri != RtpHeaderExtensionUri.Mid &&
+                ext.Uri != RtpHeaderExtensionUri.AbsSendTime &&
+                ext.Uri != RtpHeaderExtensionUri.TransportWideCcDraft01).ToList();
+
+            var consumableEncodings = consumableParams.Encodings.DeepClone();
+
+            var baseSsrc = Utils.GenerateRandomNumber();
+            var baseRtxSsrc = Utils.GenerateRandomNumber();
+
+            for (var i = 0; i < consumableEncodings.Count; ++i)
             {
+                var encoding = consumableEncodings[i];
+                encoding.Ssrc = (uint)(baseSsrc + i);
+
+                if (enableRtx)
                 {
-
-                    RtpCodecCapability matchingLocalRtxCodec = null;
-                    foreach (RtpCodecCapability localCodec in localCaps.codecs)
-                    {
-                        if (IsRtxCodec(localCodec) && Int32.Parse(localCodec.parameters["apt"]) == extendedCodec.localPayloadType)
-                        {
-                            matchingLocalRtxCodec = localCodec;
-                            break;
-                        }
-                    }
-
-                    RtpCodecCapability matchingRemoteRtxCodec = remoteCaps.codecs.First(codec => IsRtxCodec(codec)
-                    && Int32.Parse(codec.parameters["apt"]) == extendedCodec.localPayloadType);
-
-                    if (matchingLocalRtxCodec != null && matchingRemoteRtxCodec != null)
-                    {
-                        extendedCodec.localRtxPayloadType = matchingLocalRtxCodec.preferredPayloadType;
-                        extendedCodec.remoteRtxPayloadType = matchingRemoteRtxCodec.preferredPayloadType;
-                    }
+                    encoding.Rtx = new Rtx { Ssrc = (uint)(baseRtxSsrc + i) };
                 }
-            }
-
-            foreach (RtpHeaderExtension remoteExt in remoteCaps.headerExtensions)
-            {
-                RtpHeaderExtension matchingLocalExt = localCaps.headerExtensions.First(ext => matchHeaderExtensions(ext, remoteExt));
-
-                if (matchingLocalExt == null) continue;
-
-                ExtendedRtpHeaderExtension extendedExt = new ExtendedRtpHeaderExtension
+                else
                 {
-                    kind = remoteExt.kind,
-                    uri = remoteExt.uri,
-                    sendId = matchingLocalExt.preferredId,
-                    recvId = remoteExt.preferredId,
-                    preferredEncrypt = matchingLocalExt.preferredEncrypt,
-                    direction = RtpHeaderExtensionDirection.sendrecv
-                };
-
-                switch (remoteExt.direction)
-                {
-
-                    case (RtpHeaderExtensionDirection.sendrecv):
-                        {
-                            extendedExt.direction = RtpHeaderExtensionDirection.sendrecv;
-                            break;
-                        }
-                    case (RtpHeaderExtensionDirection.recvonly):
-                        {
-                            extendedExt.direction = RtpHeaderExtensionDirection.sendonly;
-                            break;
-                        }
-                    case (RtpHeaderExtensionDirection.sendonly):
-                        {
-                            extendedExt.direction = RtpHeaderExtensionDirection.recvonly;
-                            break;
-                        }
-                    case (RtpHeaderExtensionDirection.inactive):
-                        {
-                            extendedExt.direction = RtpHeaderExtensionDirection.inactive;
-                            break;
-                        }
+                    // 在 Node.js 实现中，delete 了 rtx 。
+                    encoding.Rtx = null;
                 }
 
-                extendedRtpCapabilities.headerExtensions.Add(extendedExt);
-
+                consumerParams.Encodings.Add(encoding);
             }
 
-
-            return extendedRtpCapabilities;
+            return consumerParams;
         }
 
-        private static bool matchHeaderExtensions(RtpHeaderExtension a, RtpHeaderExtension b)
+        private static bool IsRtxMimeType(string mimeType)
         {
-            if (a.kind != null && b.kind != null && a.kind != b.kind)
-            {
-                return false;
-            }
+            return RtxMimeTypeRegex.IsMatch(mimeType);
+        }
 
-            if (a.uri != b.uri) return false;
+        /// <summary>
+        /// key 要么都存在于 a 和 b，要么都不存在于 a 和 b。
+        /// </summary>
+        private static bool CheckDirectoryValueEquals(IDictionary<string, object> a, IDictionary<string, object> b, string key)
+        {
+            if (a != null && b != null)
+            {
+                var got1 = a.TryGetValue(key, out var aPacketizationMode);
+                var got2 = b.TryGetValue(key, out var bPacketizationMode);
+                // 同时存在但不相等
+                if (got1 && got2 && !aPacketizationMode!.Equals(bPacketizationMode))
+                {
+                    return false;
+                }
+                // 其中之一存在
+                else if (got1 ^ got2)
+                {
+                    return false;
+                }
+            }
+            else if (a != null && b == null)
+            {
+                // b 为 null的情况下，确保不存在于 a
+                var got = a.ContainsKey("packetization-mode");
+                if (got)
+                {
+                    return false;
+                }
+            }
+            else if (a == null && b != null)
+            {
+                // a 为 null的情况下，确保不存在于 b
+                var got = b.ContainsKey("packetization-mode");
+                if (got)
+                {
+                    return false;
+                }
+            }
 
             return true;
-
         }
 
-        public static RtpCapabilities GetRecvRtpCapabilities(ExtendedRtpCapabilities extendedRtpCapabilities)
+        private static bool MatchCodecs(RtpCodecBase aCodec, RtpCodecBase bCodec, bool strict = false, bool modify = false)
         {
-            RtpCapabilities rtpCapabilities = new RtpCapabilities();
+            var aMimeType = aCodec.MimeType.ToLower();
+            var bMimeType = bCodec.MimeType.ToLower();
 
-            foreach (ExtendedRtpCodecCapability extendedCodec in extendedRtpCapabilities.codecs)
-            {
-                RtpCodecCapability codec = new RtpCodecCapability
-                {
-                    mimeType = extendedCodec.mimeType,
-                    kind = extendedCodec.kind,
-                    preferredPayloadType = extendedCodec.remotePayloadType,
-                    clockRate = extendedCodec.clockRate,
-                    channels = extendedCodec.channels,
-                    parameters = extendedCodec.localParameters,
-                    rtcpFeedback = extendedCodec.rtcpFeedback
-                };
-
-                rtpCapabilities.codecs.Add(codec);
-
-                if (extendedCodec.remoteRtxPayloadType == null)
-                {
-                    continue;
-                }
-
-                RtpCodecCapability rtxCodec = new RtpCodecCapability
-                {
-                    mimeType = $"{extendedCodec.kind}/rtx",
-                    kind = extendedCodec.kind,
-                    preferredPayloadType = extendedCodec.remoteRtxPayloadType.Value,
-                    clockRate = extendedCodec.clockRate,
-                    parameters = new Dictionary<string, string> { { "apt", extendedCodec.remotePayloadType.ToString() } },
-                    rtcpFeedback = new List<RtcpFeedback>()
-                };
-
-                rtpCapabilities.codecs.Add(rtxCodec);
-            }
-
-            foreach (var extendedExt in extendedRtpCapabilities.headerExtensions)
-            {
-
-                if (extendedExt.direction != RtpHeaderExtensionDirection.sendrecv &&
-                      extendedExt.direction != RtpHeaderExtensionDirection.recvonly)
-                {
-                    continue;
-                }
-
-                RtpHeaderExtension ext = new RtpHeaderExtension
-                {
-                    kind = extendedExt.kind,
-                    uri = extendedExt.uri,
-                    preferredId = extendedExt.recvId,
-                    preferredEncrypt = extendedExt.preferredEncrypt,
-                    direction = extendedExt.direction
-                };
-
-                rtpCapabilities.headerExtensions.Add(ext);
-            }
-
-            return rtpCapabilities;
-        }
-
-        public static RtpParameters GetSendingRtpParameters(MediaKind kind, ExtendedRtpCapabilities extendedRtpCapabilities)
-        {
-            RtpParameters RtpParameters = new RtpParameters
-            {
-                mid = null,
-                codecs = new List<RtpCodecParameters>(),
-                headerExtensions = new List<RtpHeaderExtensionParameters>(),
-                encodings = new List<RtpEncodingParameters>(),
-                rtcpParameters = new RtcpParameters()
-            };
-
-            foreach (ExtendedRtpCodecCapability extendedCodec in extendedRtpCapabilities.codecs)
-            {
-                if (extendedCodec.kind != kind)
-                {
-                    continue;
-                }
-
-                RtpCodecParameters codec = new RtpCodecParameters
-                {
-                    mimeType = extendedCodec.mimeType,
-                    payloadType = extendedCodec.localPayloadType,
-                    clockRate = extendedCodec.clockRate,
-                    channels = extendedCodec.channels,
-                    parameters = extendedCodec.localParameters,
-                    rtcpFeedback = extendedCodec.rtcpFeedback
-                };
-
-                RtpParameters.codecs.Add(codec);
-
-                if (extendedCodec.localRtxPayloadType != null)
-                {
-                    RtpCodecParameters rtcCodec = new RtpCodecParameters
-                    {
-                        mimeType = $"{extendedCodec.kind}/rtx",
-                        payloadType = extendedCodec.localRtxPayloadType.Value,
-                        clockRate = extendedCodec.clockRate,
-                        parameters = new Dictionary<string, string> { { "apt", extendedCodec.localPayloadType.ToString() } },
-                        rtcpFeedback = new List<RtcpFeedback>()
-                    };
-
-                    RtpParameters.codecs.Add(rtcCodec);
-                }
-            }
-
-            foreach (ExtendedRtpHeaderExtension extendedExt in extendedRtpCapabilities.headerExtensions)
-            {
-                if ((extendedExt.kind != null && extendedExt.kind != kind) ||
-                    (extendedExt.direction != RtpHeaderExtensionDirection.sendonly
-                    && extendedExt.direction != RtpHeaderExtensionDirection.sendrecv))
-                {
-                    continue;
-                }
-
-                RtpHeaderExtensionParameters ext = new RtpHeaderExtensionParameters
-                {
-                    uri = extendedExt.uri,
-                    id = extendedExt.sendId,
-                    encrypt = extendedExt.preferredEncrypt,
-                    parameters = new ExpandoObject()
-                };
-
-                RtpParameters.headerExtensions.Add(ext);
-            }
-
-            return RtpParameters;
-        }
-
-        public static RtpParameters GetSendingRemoteRtpParameters(MediaKind kind, ExtendedRtpCapabilities extendedRtpCapabilities)
-        {
-            RtpParameters rtpParameters = new RtpParameters
-            {
-                mid = null,
-                codecs = new List<RtpCodecParameters>(),
-                headerExtensions = new List<RtpHeaderExtensionParameters>(),
-                encodings = new List<RtpEncodingParameters>(),
-                rtcpParameters = new RtcpParameters()
-            };
-
-            foreach (ExtendedRtpCodecCapability extendedCodec in extendedRtpCapabilities.codecs)
-            {
-                if (extendedCodec.kind != kind)
-                {
-                    continue;
-                }
-
-                RtpCodecParameters codec = new RtpCodecParameters
-                {
-                    mimeType = extendedCodec.mimeType,
-                    preferredPayloadType = extendedCodec.localPayloadType,
-                    clockRate = extendedCodec.clockRate,
-                    channels = extendedCodec.channels,
-                    parameters = extendedCodec.remoteParameters,
-                    rtcpFeedback = extendedCodec.rtcpFeedback
-                };
-
-                rtpParameters.codecs.Add(codec);
-
-                if (extendedCodec.remoteRtxPayloadType != null)
-                {
-                    RtpCodecParameters rtxCodec = new RtpCodecParameters
-                    {
-                        mimeType = $"{extendedCodec.kind}/rtx",
-                        preferredPayloadType = extendedCodec.remoteRtxPayloadType.Value,
-                        clockRate = extendedCodec.clockRate,
-                        parameters = new Dictionary<string, string> { { "apt", extendedCodec.remotePayloadType.ToString() } },
-                        rtcpFeedback = new List<RtcpFeedback>()
-                    };
-
-                    rtpParameters.codecs.Add(rtxCodec);
-                }
-            }
-
-            foreach (ExtendedRtpHeaderExtension extendedExt in extendedRtpCapabilities.headerExtensions)
-            {
-                if ((extendedExt.kind != null && extendedExt.kind != kind) ||
-                    (extendedExt.direction != RtpHeaderExtensionDirection.sendonly
-                    && extendedExt.direction != RtpHeaderExtensionDirection.sendrecv))
-                {
-                    continue;
-                }
-
-                RtpHeaderExtensionParameters ext = new RtpHeaderExtensionParameters
-                {
-                    uri = extendedExt.uri,
-                    id = extendedExt.sendId,
-                    encrypt = extendedExt.preferredEncrypt,
-                    parameters = new ExpandoObject()
-                };
-
-                rtpParameters.headerExtensions.Add(ext);
-            }
-
-            if (rtpParameters.headerExtensions.Exists(ext => ext.uri == "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01"))
-            {
-                foreach (RtpCodecCapability codec in rtpParameters.codecs)
-                {
-                    codec.rtcpFeedback = codec.rtcpFeedback.FindAll(fb => fb.type == "goog-remb");
-                }
-            }
-            else if (
-                rtpParameters.headerExtensions!.Exists(
-                    ext =>
-                        ext.uri == "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time"
-                )
-            )
-            {
-                foreach (RtpCodecCapability codec in rtpParameters.codecs)
-                {
-                    codec.rtcpFeedback = codec.rtcpFeedback.FindAll(
-                        fb => fb.type != "transport-cc"
-                    );
-                }
-            }
-            else
-            {
-                foreach (RtpCodecCapability codec in rtpParameters.codecs)
-                {
-                    codec.rtcpFeedback = codec.rtcpFeedback.FindAll(
-                        fb =>
-
-                            fb.type != "transport-cc" && fb.type != "goog-remb"
-                    );
-                }
-            }
-
-            return rtpParameters;
-        }
-
-        public static RtpParameters GenerateProbatorRtpParameters(RtpParameters videoRtpParameters)
-        {
-            RtpParameters copyRtpParameters = (RtpParameters)videoRtpParameters.Clone();
-
-            ValidateRtpParameters(copyRtpParameters);
-
-            RtpParameters rtpParameters = new RtpParameters
-            {
-                mid = RTP_PROBATOR_MID,
-                codecs = new List<RtpCodecParameters>(),
-                headerExtensions = new List<RtpHeaderExtensionParameters>(),
-                encodings = new List<RtpEncodingParameters>(),
-                rtcpParameters = new RtcpParameters
-                {
-                    cname = "probator"
-                }
-            };
-
-            rtpParameters.codecs.Add(copyRtpParameters.codecs[0]);
-            rtpParameters.codecs[0].payloadType = RTP_PROBATOR_CODEC_PAYLOAD_TYPE;
-            rtpParameters.headerExtensions = copyRtpParameters.headerExtensions;
-
-            return rtpParameters;
-        }
-
-        public static bool CanSend(MediaKind kind, ExtendedRtpCapabilities rtpCapabilities)
-        {
-            return rtpCapabilities.codecs.Exists(codec => codec.kind == kind);
-        }
-
-        public static bool CanReceive(RtpParameters rtpParameters, ExtendedRtpCapabilities extendedRtpCapabilities)
-        {
-            ValidateRtpParameters(rtpParameters);
-
-            if (rtpParameters.codecs.Count == 0)
+            if (aMimeType != bMimeType || aCodec.ClockRate != bCodec.ClockRate || aCodec.Channels != bCodec.Channels)
             {
                 return false;
             }
 
-            RtpCodecParameters rtpCodecCapability = rtpParameters.codecs[0];
-
-            return extendedRtpCapabilities.codecs.Exists(codec => codec.remotePayloadType == rtpCodecCapability.preferredPayloadType);
-        }
-
-        public static bool IsRtxCodec(RtpCodecCapability codec)
-        {
-            if (codec == null)
-            {
-                return false;
-            }
-
-            return Regex.IsMatch(codec.mimeType ?? "", @".+\/rtx$", RegexOptions.IgnoreCase);
-        }
-
-        public static bool MatchCodecs(RtpCodecCapability aCodec, RtpCodecCapability bCodec, bool strict = false, bool modify = false)
-        {
-            string aMimeType = aCodec.mimeType.ToLower();
-            string bMimeType = bCodec.mimeType.ToLower();
-
-            if (aMimeType != bMimeType)
-            {
-                return false;
-            }
-
-            if (aCodec.clockRate != bCodec.clockRate)
-            {
-                return false;
-            }
-
-            if (aCodec.channels != bCodec.channels)
-            {
-                return false;
-            }
-
+            // Per codec special checks.
             switch (aMimeType)
             {
-                case "video/h264":
+                case "audio/multiopus":
                     {
+                        var aNumStreams = aCodec.Parameters!["num_streams"];
+                        var bNumStreams = bCodec.Parameters!["num_streams"];
+
+                        if (aNumStreams != bNumStreams)
+                        {
+                            return false;
+                        }
+
+                        var aCoupledStreams = aCodec.Parameters["coupled_streams"];
+                        var bCoupledStreams = bCodec.Parameters["coupled_streams"];
+
+                        if (aCoupledStreams != bCoupledStreams)
+                        {
+                            return false;
+                        }
+
+                        break;
+                    }
+                case "video/h264":
+                case "video/h264-svc":
+                    {
+                        // If strict matching check profile-level-id.
                         if (strict)
                         {
-                            object aPacketizationMode = aCodec.parameters["packetization-mode"];
-                            object bPacketizationMode = bCodec.parameters["packetization-mode"];
-
-                            if (aPacketizationMode != bPacketizationMode)
+                            if (!CheckDirectoryValueEquals(aCodec.Parameters!, aCodec.Parameters!, "packetization-mode"))
                             {
                                 return false;
                             }
 
-
-
-                            if (!h264.isSameProfile(aCodec.parameters, bCodec.parameters))
+                            if (!Huddle01.H264ProfileLevelId.Utils.IsSameProfile(aCodec.Parameters!, bCodec.Parameters!))
                             {
                                 return false;
                             }
-
-                            string selectedProfileLevelId;
+                            string? selectedProfileLevelId;
 
                             try
                             {
-                                selectedProfileLevelId = h264.generateProfileLevelIdStringForAnswer(
-                                   aCodec.parameters,
-                                   bCodec.parameters
-                               );
+                                selectedProfileLevelId = Huddle01.H264ProfileLevelId.Utils.GenerateProfileLevelIdForAnswer(aCodec.Parameters!, bCodec.Parameters!);
                             }
-                            catch (Exception err)
+                            catch (Exception ex)
                             {
-                                Console.WriteLine("Error generating profile-level-id string for answer: " + err.Message);
+                                Debug.WriteLine($"MatchCodecs() | {ex.Message}");
                                 return false;
                             }
 
                             if (modify)
                             {
-                                if (selectedProfileLevelId != null)
+                                if (!selectedProfileLevelId.IsNullOrWhiteSpace())
                                 {
-                                    aCodec.parameters["profile-level-id"] = selectedProfileLevelId;
-                                    bCodec.parameters["profile-level-id"] = selectedProfileLevelId;
+                                    aCodec.Parameters!["profile-level-id"] = selectedProfileLevelId!;
                                 }
                                 else
                                 {
-                                    if (aCodec.parameters.ContainsKey("profile-level-id"))
-                                    {
-                                        aCodec.parameters.Remove("profile-level-id");
-                                    }
-
-                                    if (bCodec.parameters.ContainsKey("profile-level-id"))
-                                    {
-                                        bCodec.parameters.Remove("profile-level-id");
-                                    }
+                                    aCodec.Parameters!.Remove("profile-level-id");
                                 }
                             }
                         }
 
                         break;
                     }
-
                 case "video/vp9":
                     {
                         if (strict)
                         {
-                            string aProfileId = aCodec.parameters["profile-id"];
-                            string bProfileId = bCodec.parameters["profile-id"];
-
-                            if (aProfileId != bProfileId)
+                            if (!CheckDirectoryValueEquals(aCodec.Parameters!, aCodec.Parameters!, "profile-id"))
                             {
                                 return false;
                             }
@@ -935,76 +1170,34 @@ namespace Mediasoup.Ortc
 
                         break;
                     }
+
+                default:
+                    break;
             }
 
             return true;
         }
 
-        public static bool MatchHeaderExtensions()
+        private static bool MatchCodecsWithPayloadTypeAndApt(int? payloadType, IDictionary<string, object> parameters)
         {
-            return false;
-        }
-        public static List<RtcpFeedback> ReduceRtcpFeedback(RtpCodecCapability codecA, RtpCodecCapability codecB)
-        {
-            List<RtcpFeedback> reducedRtcpFeedback = new List<RtcpFeedback>();
-
-            foreach (RtcpFeedback aFb in codecA.rtcpFeedback)
+            if (payloadType == null && parameters == null)
             {
-                foreach (RtcpFeedback bFb in codecB.rtcpFeedback)
-                {
-                    if (aFb.type == bFb.type)
-                    {
-                        if (aFb.parameters == bFb.parameters || (aFb.parameters == null && bFb.parameters == null))
-                        {
-                            reducedRtcpFeedback.Add(aFb);
-                            break;
-                        }
-                    }
-                }
+                return true;
             }
 
-            return reducedRtcpFeedback;
-        }
-
-        public static byte GetH264PacketizationMode()
-        {
-            return byte.MaxValue;
-        }
-        public static byte GetH264LevelAssimetryAllowed()
-        {
-            return byte.MaxValue;
-        }
-        public static string GetH264ProfileLevelId()
-        {
-            return null;
-        }
-        public static string GetVP9ProfileId()
-        {
-            return null;
-        }
-
-
-    }
-
-    public static class OrtcUtils
-    {
-        public static void AddNackSuppportForOpus(RtpCapabilities rtpCapabilities)
-        {
-            foreach (var codec in rtpCapabilities.codecs)
+            if (parameters == null)
             {
-                if ((codec.mimeType.ToLower() == "audio/opus" || codec.mimeType.ToLower() == "audio/multiopus") &&
-                    (codec.rtcpFeedback?.Any(fb => fb.type == "nack" && fb.parameters == null) == true))
-                {
-                    if (codec.rtcpFeedback != null)
-                    {
-                        codec.rtcpFeedback = new List<RtcpFeedback>();
-                    }
-
-
-                    RtcpFeedback nackSupp = new RtcpFeedback { type = "nack", parameters = "" };
-                    codec.rtcpFeedback.Add(nackSupp);
-                }
+                return false;
             }
+
+            if (!parameters.TryGetValue("apt", out var apt))
+            {
+                return false;
+            }
+            
+            var aptInteger = Convert.ToInt32(apt);
+
+            return payloadType == aptInteger;
         }
     }
 }
