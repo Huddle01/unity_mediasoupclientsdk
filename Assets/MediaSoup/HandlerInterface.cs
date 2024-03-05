@@ -282,7 +282,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             foreach (var encoding in options.encodings)
             {
                 int temporalLayers = !string.IsNullOrEmpty(encoding.ScalabilityMode) ?
-                                        ScalabilityModeParser.Parse(encoding.ScalabilityMode).temporalLayers :
+                                        ScalabilityMode.Parse(encoding.ScalabilityMode).TemporalLayers :
                                         3;
 
                 if (temporalLayers > maxTemporalLayers)
