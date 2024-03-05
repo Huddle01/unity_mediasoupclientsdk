@@ -50,5 +50,22 @@ namespace Mediasoup.RtpParameter
         /// </summary>
         public uint? MaxBitrate { get; set; }
 
+        public uint? MaxFramerate { get; set; }
+
+
+        public bool? AdaptivePtime { get; set;  }
+
+	    public PriorityLevel? priority { get; set; }
+	    
+        public PriorityLevel? networkPriority { get; set; }
+
+
+        public enum PriorityLevel { 
+            VeryLow,
+            Low,
+            Medium,
+            High
+        }
+
     }
 }

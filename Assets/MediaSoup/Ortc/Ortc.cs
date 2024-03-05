@@ -756,7 +756,6 @@ namespace Mediasoup.Ortc
                 var mappedSsrc = rtpMapping.Encodings[i].MappedSsrc;
 
                 // Remove useless fields.
-                // 在 Node.js 实现中，rid, rtx, codecPayloadType 被 delete 了。
                 consumableEncoding.Rid = null;
                 consumableEncoding.Rtx = null;
                 consumableEncoding.CodecPayloadType = null;
@@ -1028,7 +1027,6 @@ namespace Mediasoup.Ortc
                 }
                 else
                 {
-                    // 在 Node.js 实现中，delete 了 rtx 。
                     encoding.Rtx = null;
                 }
 
@@ -1043,21 +1041,16 @@ namespace Mediasoup.Ortc
             return RtxMimeTypeRegex.IsMatch(mimeType);
         }
 
-        /// <summary>
-        /// key 要么都存在于 a 和 b，要么都不存在于 a 和 b。
-        /// </summary>
         private static bool CheckDirectoryValueEquals(IDictionary<string, object> a, IDictionary<string, object> b, string key)
         {
             if (a != null && b != null)
             {
                 var got1 = a.TryGetValue(key, out var aPacketizationMode);
                 var got2 = b.TryGetValue(key, out var bPacketizationMode);
-                // 同时存在但不相等
                 if (got1 && got2 && !aPacketizationMode!.Equals(bPacketizationMode))
                 {
                     return false;
                 }
-                // 其中之一存在
                 else if (got1 ^ got2)
                 {
                     return false;
@@ -1065,7 +1058,6 @@ namespace Mediasoup.Ortc
             }
             else if (a != null && b == null)
             {
-                // b 为 null的情况下，确保不存在于 a
                 var got = a.ContainsKey("packetization-mode");
                 if (got)
                 {
@@ -1074,7 +1066,6 @@ namespace Mediasoup.Ortc
             }
             else if (a == null && b != null)
             {
-                // a 为 null的情况下，确保不存在于 b
                 var got = b.ContainsKey("packetization-mode");
                 if (got)
                 {
@@ -1433,6 +1424,44 @@ namespace Mediasoup.Ortc
             return RtpParameters;
         }
 
+        public static List<RtpCodecParameters> ReduceCodecs(List<RtpCodecParameters> codecs, RtpCodecCapability? capCodec) { 
+            
+            List<RtpCodecParameters> filteredCodecs = new List<RtpCodecParameters>();
+
+            if (capCodec == null)
+            {
+                filteredCodecs.Add(codecs[0]);
+
+                if (codecs[1] != null && IsRtxMimeType(codecs[1].MimeType))
+                {
+                    filteredCodecs.Add(codecs[1]);
+                }
+            }
+            else {
+                for (var idx = 0; idx < codecs.Count; ++idx)
+                {
+                    if (MatchCodecs(codecs[idx], capCodec))
+                    {
+                        filteredCodecs.Add(codecs[idx]);
+
+                        if (codecs != null && IsRtxMimeType(codecs[idx + 1].MimeType))
+                        {
+                            filteredCodecs.Add(codecs[idx + 1]);
+                        }
+
+                        break;
+                    }
+                }
+
+                if (filteredCodecs.Count == 0)
+                {
+                    throw new Exception("no matching codec");
+                }
+
+            }
+            
+            return filteredCodecs;
+        }
 
     }
 

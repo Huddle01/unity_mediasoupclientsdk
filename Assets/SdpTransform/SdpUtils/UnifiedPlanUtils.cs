@@ -9,7 +9,7 @@ using System.Linq;
 
 public class UnifiedPlanUtils
 {
-    public List<RtpEncodingParameters> GetRtpEncodingParameters(MediaDescription offerMediaObject)
+    public static List<RtpEncodingParameters> GetRtpEncodingParameters(MediaDescription offerMediaObject)
     {
         List<uint> ssrcs = new List<uint>();
 

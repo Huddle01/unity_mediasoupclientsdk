@@ -230,7 +230,7 @@ public class CommonUtils
 
         if (offerMediaObject != null && offerMediaObject.Count > 0)
         {
-            ssrc = offerMediaObject.FirstOrDefault<Ssrc>(x => x.Attribute == "cname");
+            ssrc = offerMediaObject.FirstOrDefault<Ssrc>(x => x.Attribute.ToLower() == "cname");
         }
 
         if (ssrc == null)
