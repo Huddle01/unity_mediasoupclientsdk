@@ -66,22 +66,22 @@ namespace Mediasoup.RtpParameter
 
     public class ExtendedRtpHeaderExtension : RtpHeaderExtension
     {
-        public int sendId;
-        public int recvId;
+        public byte sendId;
+        public byte recvId;
     }
 
     public class ExtendedRtpCodecCapability
     {
         public string mimeType;
         public MediaKind kind;
-        public int clockRate;
-        public int? channels;
-        public int localPayloadType;
-        public Nullable<int> localRtxPayloadType;
-        public int remotePayloadType;
-        public Nullable<int> remoteRtxPayloadType;
-        public Dictionary<string, string> localParameters;
-        public Dictionary<string, string> remoteParameters;
+        public uint clockRate;
+        public byte? channels;
+        public byte localPayloadType;
+        public byte? localRtxPayloadType;
+        public byte remotePayloadType;
+        public byte? remoteRtxPayloadType;
+        public Dictionary<string, object> localParameters;
+        public Dictionary<string, object> remoteParameters;
         public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
     }
 

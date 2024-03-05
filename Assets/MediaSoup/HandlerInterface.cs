@@ -389,7 +389,7 @@ public class HandlerRunOptions
 	public RTCIceTransportPolicy iceTransportPolicy;
 	public object additionalSettings;
 	public object proprietaryConstraints;
-	public RtpCapabilities extendedRtpCapabilities;
+	public ExtendedRtpCapabilities extendedRtpCapabilities;
 }
 
 public class HandlerSendResult 

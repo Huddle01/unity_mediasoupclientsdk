@@ -23,7 +23,7 @@ namespace Mediasoup.RtpParameter
         /// Media kind.
         /// Default any media kind.
         /// </summary>
-        public MediaKind Kind { get; set; }
+        public MediaKind? Kind { get; set; }
 
         /// <summary>
         /// The URI of the RTP header extension, as defined in RFC 5285.
