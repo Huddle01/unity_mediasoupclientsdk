@@ -128,11 +128,11 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 			false
 		);
 
-		_sendingRtpParametersByKind.Add("audio",Ortc.GetSendingRtpParameters(MediaKind.audio, options.extendedRtpCapabilities));
-		_sendingRtpParametersByKind.Add("video", Ortc.GetSendingRtpParameters(MediaKind.video, options.extendedRtpCapabilities));
+		_sendingRtpParametersByKind.Add("audio", ORTC.GetSendingRtpParameters(MediaKind.AUDIO, options.extendedRtpCapabilities));
+		_sendingRtpParametersByKind.Add("video", ORTC.GetSendingRtpParameters(MediaKind.VIDEO, options.extendedRtpCapabilities));
 
-		_sendingRemoteRtpParametersByKind.Add("audio", Ortc.GetSendingRemoteRtpParameters(MediaKind.audio, options.extendedRtpCapabilities));
-		_sendingRemoteRtpParametersByKind.Add("video", Ortc.GetSendingRemoteRtpParameters(MediaKind.video, options.extendedRtpCapabilities));
+		_sendingRemoteRtpParametersByKind.Add("audio", ORTC.GetSendingRemoteRtpParameters(MediaKind.AUDIO, options.extendedRtpCapabilities));
+		_sendingRemoteRtpParametersByKind.Add("video", ORTC.GetSendingRemoteRtpParameters(MediaKind.VIDEO, options.extendedRtpCapabilities));
 
 		if (options.dtlsParameters!=null && options.dtlsParameters.role != DtlsRole.auto) 
 		{

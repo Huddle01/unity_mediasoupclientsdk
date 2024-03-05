@@ -8,33 +8,33 @@ using System.Text;
 
 public class CommonUtils
 {
-    public static RtpCapabilities ExtractRtpCapabilities(Sdp sdp) 
+    public static RtpCapabilities ExtractRtpCapabilities(Sdp sdp)
     {
-        Dictionary<int, RtpCodecCapability> codecsMap = new Dictionary<int, RtpCodecCapability>();
+        Dictionary<byte, RtpCodecCapability> codecsMap = new Dictionary<byte, RtpCodecCapability>();
         List<RtpHeaderExtension> headerExtensions = new List<RtpHeaderExtension>();
 
         bool gotAudio = false;
         bool gotVideo = false;
 
-        foreach (var mediaDes in sdp.MediaDescriptions) 
+        foreach (var mediaDes in sdp.MediaDescriptions)
         {
             MediaType mediaType = mediaDes.Media;
 
             MediaKind mediaKind;
 
 
-            switch (mediaDes.Media) 
+            switch (mediaDes.Media)
             {
                 case MediaType.Audio:
                     if (gotAudio) continue;
                     gotAudio = true;
-                    mediaKind = MediaKind.audio;
+                    mediaKind = MediaKind.AUDIO;
                     break;
 
                 case MediaType.Video:
                     if (gotVideo) continue;
                     gotVideo = true;
-                    mediaKind = MediaKind.video;
+                    mediaKind = MediaKind.VIDEO;
                     break;
 
                 default:
@@ -46,26 +46,26 @@ public class CommonUtils
             {
                 RtpCodecCapability codecCap = new RtpCodecCapability
                 {
-                    kind = mediaKind,
-                    mimeType = rtp.EncodingName,
-                    clockRate = rtp.ClockRate,
-                    preferredPayloadType = rtp.PayloadType
+                    Kind = mediaKind,
+                    MimeType = rtp.EncodingName,
+                    ClockRate = rtp.ClockRate,
+                    PreferredPayloadType = rtp.PayloadType
                 };
 
-                if (rtp.Channels != null) codecCap.channels = rtp.Channels.Value;
+                if (rtp.Channels != null) codecCap.Channels = rtp.Channels.Value;
 
-                codecsMap.Add(codecCap.preferredPayloadType, codecCap);
+                codecsMap.Add(codecCap.PreferredPayloadType.Value, codecCap);
             }
 
             //Get codec Parameters
-            foreach (var fmtp in mediaDes.Attributes.Fmtps) 
+            foreach (var fmtp in mediaDes.Attributes.Fmtps)
             {
                 Dictionary<string, object> parameters = new Dictionary<string, object>();
 
                 string[] configPayload = fmtp.Value.Split(" ");
                 string[] paramList = configPayload[1].Split(';');
 
-                foreach (string pair in paramList) 
+                foreach (string pair in paramList)
                 {
                     var keyValue = pair.Split('=');
 
@@ -78,9 +78,9 @@ public class CommonUtils
 
                 RtpCodecCapability codec;
 
-                if (codecsMap.TryGetValue(fmtp.PayloadType,out codec)) 
+                if (codecsMap.TryGetValue(fmtp.PayloadType, out codec))
                 {
-                    codecsMap[fmtp.PayloadType].parameters = parameters;
+                    codecsMap[fmtp.PayloadType].Parameters = parameters;
                 }
             }
 
@@ -90,8 +90,8 @@ public class CommonUtils
             {
                 RtcpFeedback feedback = new RtcpFeedback
                 {
-                    parameters = fb.SubType,
-                    type = fb.Type
+                    Parameter = fb.SubType,
+                    Type = fb.Type
                 };
 
                 if (codecsMap.ContainsKey(fb.PayloadType))
@@ -101,35 +101,42 @@ public class CommonUtils
                         continue;
                     }
 
-                    codecsMap[fb.PayloadType].rtcpFeedback.Add(feedback);
+                    codecsMap[fb.PayloadType].RtcpFeedback.Add(feedback);
                 }
             }
 
             // Get RTP header extensions.
             foreach (var ext in mediaDes.Attributes.Extmaps)
             {
-                RtpHeaderExtension headerExt = new RtpHeaderExtension
+                try
                 {
-                    kind = mediaKind,
-                    uri = ext.Uri.AbsoluteUri,
-                    preferredId = ext.Value
-                };
+                    RtpHeaderExtension headerExt = new RtpHeaderExtension
+                    {
+                        Kind = mediaKind,
+                        Uri = EnumExtensions.GetEnumValueFromEnumMemberValue<RtpHeaderExtensionUri>(ext.Uri.AbsoluteUri),
+                        PreferredId = ext.Value
+                    };
 
 
-                headerExtensions.Add(headerExt);
+                    headerExtensions.Add(headerExt);
+
+                }
+                catch (ArgumentException err) { 
+                    Console.WriteLine("CommonUtils: Failed to get enum from value", err.Message);
+                }
             }
         }
 
         RtpCapabilities rtpCapabilities = new RtpCapabilities
         {
-            codecs = codecsMap.Values.ToList(),
-            headerExtensions = headerExtensions
+            Codecs = codecsMap.Values.ToList(),
+            HeaderExtensions = headerExtensions.ToArray()
         };
 
         return rtpCapabilities;
     }
 
-    public static DtlsParameters ExtractDtlsParameters(Sdp sdp) 
+    public static DtlsParameters ExtractDtlsParameters(Sdp sdp)
     {
         Setup setup = sdp.Attributes.Setup;
         Fingerprint fingerPrint = sdp.Attributes.Fingerprint;
@@ -150,28 +157,28 @@ public class CommonUtils
             }
         }
 
-        if (setup==null)
+        if (setup == null)
         {
             throw new Exception("no a=setup found at SDP session or media level");
         }
-        else if (fingerPrint==null)
+        else if (fingerPrint == null)
         {
             throw new Exception("no a=fingerprint found at SDP session or media level");
         }
 
         DtlsRole role = DtlsRole.auto;
 
-        switch (setup.Role.GetStringValue()) 
+        switch (setup.Role.GetStringValue())
         {
             case "active":
                 role = DtlsRole.client;
                 break;
-                    
+
 
             case "passive":
                 role = DtlsRole.server;
                 break;
-                    
+
             case "actpass":
                 role = DtlsRole.auto;
                 break;
@@ -180,7 +187,7 @@ public class CommonUtils
         List<DtlsFingerprint> fingerPrintLIst = new List<DtlsFingerprint>();
         DtlsFingerprint finger = new DtlsFingerprint();
 
-        switch (fingerPrint.HashFunction) 
+        switch (fingerPrint.HashFunction)
         {
             case HashFunction.Sha1:
                 finger.algorithm = FingerPrintAlgorithm.sha1;
@@ -202,12 +209,12 @@ public class CommonUtils
                 finger.algorithm = FingerPrintAlgorithm.sha512;
                 break;
         }
-            
+
         finger.value = Encoding.UTF8.GetString(fingerPrint.HashValue);
 
         fingerPrintLIst.Add(finger);
 
-        DtlsParameters dtlsParams = new DtlsParameters 
+        DtlsParameters dtlsParams = new DtlsParameters
         {
             role = role,
             fingerprints = fingerPrintLIst
@@ -217,7 +224,7 @@ public class CommonUtils
 
     }
 
-    public static string GetCName(IList<Ssrc> offerMediaObject) 
+    public static string GetCName(IList<Ssrc> offerMediaObject)
     {
         Ssrc ssrc = null;
 
@@ -226,7 +233,7 @@ public class CommonUtils
             ssrc = offerMediaObject.FirstOrDefault<Ssrc>(x => x.Attribute == "cname");
         }
 
-        if (ssrc==null) 
+        if (ssrc == null)
         {
             return "";
         }
@@ -234,11 +241,11 @@ public class CommonUtils
         return ssrc.Value;
     }
 
-    public static void ApplyCodecParameters(RtpParameters offerRtpParameters,Sdp answerMediaObject) 
+    public static void ApplyCodecParameters(RtpParameters offerRtpParameters, Sdp answerMediaObject)
     {
-        foreach (var codec in offerRtpParameters.codecs) 
+        foreach (var codec in offerRtpParameters.Codecs)
         {
-            string mimeType = codec.mimeType.ToLower();
+            string mimeType = codec.MimeType.ToLower();
 
             if (mimeType != "audio/opus")
             {
@@ -246,21 +253,21 @@ public class CommonUtils
             }
 
             Rtpmap rtp = null;
-            if (answerMediaObject.Attributes.Rtpmaps!=null && answerMediaObject.Attributes.Rtpmaps.Count > 0) 
+            if (answerMediaObject.Attributes.Rtpmaps != null && answerMediaObject.Attributes.Rtpmaps.Count > 0)
             {
-                rtp = answerMediaObject.Attributes.Rtpmaps.FirstOrDefault<Rtpmap>(f=>f.PayloadType==codec.payloadType);
+                rtp = answerMediaObject.Attributes.Rtpmaps.FirstOrDefault<Rtpmap>(f => f.PayloadType == codec.PayloadType);
             }
 
             if (rtp == null) continue;
 
             Fmtp fmtp = null;
 
-            if (answerMediaObject.Attributes.Fmtps==null) 
+            if (answerMediaObject.Attributes.Fmtps == null)
             {
                 answerMediaObject.Attributes.Fmtps = new List<Fmtp>();
             }
 
-            fmtp = answerMediaObject.Attributes.Fmtps.FirstOrDefault<Fmtp>(f => f.PayloadType == codec.payloadType);
+            fmtp = answerMediaObject.Attributes.Fmtps.FirstOrDefault<Fmtp>(f => f.PayloadType == codec.PayloadType);
 
             answerMediaObject.Attributes.Fmtps.Add(fmtp);
 
@@ -280,23 +287,23 @@ public class CommonUtils
                 }
             }
 
-            switch (mimeType) 
+            switch (mimeType)
             {
                 case "audio/opus":
-                    
-                    object spropStereo = codec.parameters["sprop-stereo"];
+
+                    object spropStereo = codec.Parameters["sprop-stereo"];
 
                     if (spropStereo != null)
                     {
                         fmtpParameters["stereo"] = spropStereo;
                     }
                     break;
-                    
+
             }
 
             string fmtpConfig = configPayload[0] + " ";
 
-            foreach (var par in fmtpParameters) 
+            foreach (var par in fmtpParameters)
             {
                 fmtpConfig += par.Key + "=" + par.Value + ";";
             }

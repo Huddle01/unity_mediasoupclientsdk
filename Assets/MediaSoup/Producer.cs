@@ -212,7 +212,7 @@ namespace Mediasoup
             {
                 throw new InvalidOperationException("Closed");
             }
-            else if (kind != MediaKind.video)
+            else if (kind != MediaKind.VIDEO)
             {
                 throw new InvalidProgramException("not a video producer");
             }
