@@ -465,7 +465,7 @@ namespace Mediasoup.Ortc
             }
 
             if (orderedGiven &&
-                parameters.ordered.Value &&
+                parameters.ordered.HasValue && parameters.ordered.Value &&
                 (parameters.maxPacketLifeTime.HasValue || parameters.maxRetransmits.HasValue)
                 )
             {
@@ -1223,7 +1223,7 @@ namespace Mediasoup.Ortc
 
                 rtpParameters.Codecs.Add(codec);
 
-                if (extendedCodec.remoteRtxPayloadType != null)
+                if (extendedCodec.remoteRtxPayloadType.HasValue)
                 {
                     RtpCodecParameters rtxCodec = new RtpCodecParameters
                     {
@@ -1313,7 +1313,7 @@ namespace Mediasoup.Ortc
 
                 rtpCapabilities.Codecs.Add(codec);
 
-                if (extendedCodec.remoteRtxPayloadType == null)
+                if (!extendedCodec.remoteRtxPayloadType.HasValue)
                 {
                     continue;
                 }
@@ -1386,7 +1386,7 @@ namespace Mediasoup.Ortc
 
                 RtpParameters.Codecs.Add(codec);
 
-                if (extendedCodec.localRtxPayloadType != null)
+                if (extendedCodec.localRtxPayloadType.HasValue)
                 {
                     RtpCodecParameters rtcCodec = new RtpCodecParameters
                     {
