@@ -5,16 +5,16 @@ using Unity.WebRTC;
 using Mediasoup.SctpParameter;
 using Mediasoup.Internal;
 
-namespace Mediasoup.DataProducers 
+namespace Mediasoup.DataProducers
 {
-    public interface IDataProducer 
+    public interface IDataProducer
     {
         string id { get; }
         RTCDataChannel dataChannel { get; }
         bool isClosed { get; }
         SctpStreamParameters sctpStreamParameters { get; }
         object dataProducerAppData { get; }
-        EnhancedEventEmitter observer { get; }
+        EnhancedEventEmitter<DataProducerEvents> observer { get; }
 
         void Close();
         void TransportClosed();
@@ -34,7 +34,7 @@ namespace Mediasoup.DataProducers
 
         public object dataProducerAppData { get; private set; }
 
-        public EnhancedEventEmitter observer { get; private set; }
+        public EnhancedEventEmitter<DataProducerEvents> observer { get; private set; }
 
 
         public DataProducer(string _id, RTCDataChannel _dataChannel, SctpStreamParameters _sctpStreamParameters,
@@ -45,7 +45,7 @@ namespace Mediasoup.DataProducers
             sctpStreamParameters = _sctpStreamParameters;
             if (_appData != null) dataProducerAppData = _appData ?? typeof(TDataProducerAppData).New<TDataProducerAppData>()!;
 
-            observer = new EnhancedEventEmitter<ConsumerObserverEvents>();
+            observer = new EnhancedEventEmitter<DataProducerEvents>();
 
             HandleDataChannel();
         }
@@ -80,7 +80,7 @@ namespace Mediasoup.DataProducers
 
         public void Send(object message)
         {
-            if (isClosed) 
+            if (isClosed)
             {
                 throw new InvalidOperationException("closed");
             }
@@ -89,7 +89,8 @@ namespace Mediasoup.DataProducers
             {
                 string msg = (string)message;
                 dataChannel.Send(msg);
-            } else if (message is byte[]) 
+            }
+            else if (message is byte[])
             {
                 byte[] msg = (byte[])message;
                 dataChannel.Send(msg);
@@ -119,7 +120,6 @@ namespace Mediasoup.DataProducers
             if (isClosed) return;
             _ = SafeEmit("open");
         }
-
 
         private void OnDatachannelClose()
         {
@@ -152,7 +152,7 @@ namespace Mediasoup.DataProducers
             _ = SafeEmit("error", error);
         }
 
-        
+
     }
 
     public class DataProducerOptions<TDataProducerAppData>
@@ -181,5 +181,3 @@ namespace Mediasoup.DataProducers
         public List<Action> Close { get; set; } = new List<Action>();
     }
 }
-
-

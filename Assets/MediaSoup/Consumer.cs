@@ -24,7 +24,7 @@ namespace Mediasoup
         void Resume();
         void TransportClosed();
 
-        EnhancedEventEmitter observer { get; set; }
+        EnhancedEventEmitter<ConsumerObserverEvents> observer { get; set; }
 
     }
 
@@ -42,9 +42,9 @@ namespace Mediasoup
         public bool isPaused { get; set; }
 
 
-        public EnhancedEventEmitter observer { get; set; }
+        public EnhancedEventEmitter<ConsumerObserverEvents> observer { get; set; }
 
-        public Consumer(string _id,string _localId, string _producerId, RTCRtpReceiver _rtpReceiver,
+        public Consumer(string _id, string _localId, string _producerId, RTCRtpReceiver _rtpReceiver,
                             MediaStreamTrack _track, RtpParameters _rtpParameters, TConsumerAppData? _appData) : base()
         {
             id = _id;
@@ -59,9 +59,9 @@ namespace Mediasoup
             observer = new EnhancedEventEmitter<ConsumerObserverEvents>();
         }
 
-        ~Consumer() 
+        ~Consumer()
         {
-            
+
         }
 
         public void Close()
@@ -127,7 +127,7 @@ namespace Mediasoup
 
         private void HandleTrack()
         {
-            
+
         }
 
         private void DestroyTrack()
@@ -162,7 +162,7 @@ namespace Mediasoup
         public TConsumerAppData appData;
     }
 
-    public class ConsumerObserverEvents 
+    public class ConsumerObserverEvents
     {
         public List<Action> OnClose { get; set; } = new List<Action>();
         public List<Action> OnPause { get; set; } = new List<Action>();

@@ -15,7 +15,7 @@ namespace Mediasoup.Internal
     {
         protected EnhancedEventEmitter()
         {
-            
+
         }
 
         public async Task<bool> SafeEmit(string name, params object?[]? args)
