@@ -196,7 +196,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
 	}
 
-	public virtual void UpdateIceServers(List<RTCIceServer> iceServers) 
+	public virtual async Task UpdateIceServers(List<RTCIceServer> iceServers) 
 	{
 		RTCConfiguration config = pc.GetConfiguration();
 
@@ -206,7 +206,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
 	}
 
-	public virtual async void RestartIce(IceParameters iceParameters) 
+	public virtual async Task RestartIce(IceParameters iceParameters) 
 	{
 		// Provide the remote SDP handler with new remote ICE parameters.
 		if (remoteSdp != null) 
@@ -760,7 +760,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
 	}
 
-	public virtual async void StopReceiving(List<string> localIds) 
+	public virtual async Task StopReceiving(List<string> localIds) 
 	{
 		if (isClosed) return;
 
@@ -823,7 +823,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 		_ = await SetLocalDescriptionAsync(pc, answer.Desc);
 	}
 
-	public virtual async void ResumeReceiving(List<string> localIds)
+	public virtual async Task ResumeReceiving(List<string> localIds)
 	{
 		foreach (string localId in localIds)
 		{

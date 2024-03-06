@@ -47,6 +47,21 @@ namespace Mediasoup.Internal
                 return numListeners > 0;
             }
         }
+
+        public async Task<T> SafeEmit<T>(string name, Func<Task<T>> callback, Action<string> errorCallback, params object[]? args)
+        {
+            var numListeners = ListenerCount(name);
+            try
+            {
+                await Emit(name, args);
+                return await callback.Invoke();
+            }
+            catch (Exception e)
+            {
+                errorCallback?.Invoke(e.Message);
+                throw new Exception("SafeEmit");
+            }
+        }
     }
 
     public class EnhancedEventEmitter<TEvent> : EnhancedEventEmitter, IEnhancedEventEmitter<TEvent>

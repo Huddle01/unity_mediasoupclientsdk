@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using Unity.WebRTC;
@@ -14,6 +15,8 @@ using Mediasoup;
 using System.Threading.Tasks;
 using Mediasoup.Types;
 using Newtonsoft.Json.Converters;
+using UnityEngine;
+using Mediasoup.Ortc;
 
 /// <summary>
 /// 
@@ -52,7 +55,7 @@ namespace Mediasoup.Transports
         void Close();
         RTCStatsReport GetStats();
         Task RestartIceAsync(IceParameters iceParameters);
-        Task RestartIceAsync(List<RTCIceServer> iceServers);
+        Task UpdateIceServers(List<RTCIceServer> iceServers);
 
         Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(
         ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new();
@@ -67,9 +70,9 @@ namespace Mediasoup.Transports
         ProducerOptions<DataConsumerAppData> options = null) where DataConsumerAppData : AppData, new();
 
 
-        void PausePendingConsumers();
-        void ResumePendingConsumers();
-        void ClosePendingConsumers();
+        Task PausePendingConsumers();
+        Task ResumePendingConsumers();
+        Task ClosePendingConsumers();
 
     }
 
@@ -123,6 +126,8 @@ namespace Mediasoup.Transports
 
         public EnhancedEventEmitter<TransportObserverEvents> observer { get; set; }
 
+        public AwaitQueue awaitQueue;
+
         //Constructor
         public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
                         DtlsParameters _dtlsParameters,SctpParameters _sctpParameters,List<RTCIceServer> _iceServers,
@@ -157,6 +162,8 @@ namespace Mediasoup.Transports
             handlerRunOptions.additionalSettings = _additionalSettings;
             handlerRunOptions.proprietaryConstraints = _proprietaryConstraints;
             handlerRunOptions.extendedRtpCapabilities = _extendedRtpCapabilities;
+
+            awaitQueue = new AwaitQueue();
 
             handlerInterface.Run(handlerRunOptions);
             observer = new EnhancedEventEmitter<TransportObserverEvents>();
@@ -213,18 +220,147 @@ namespace Mediasoup.Transports
         }
         public Task RestartIceAsync(IceParameters iceParameters)
         {
-            throw new NotImplementedException();
+            if (isClosed) 
+            {
+                throw new InvalidOperationException("Closed");
+            }else if (iceParameters==null) 
+            {
+                throw new ArgumentNullException("missing iceParameters");
+            }
+
+            return awaitQueue.Push(async () => 
+            {
+                await handlerInterface.RestartIce(iceParameters);
+                return new object();
+
+            }, "transport.RestartIceAsync");
         }
 
-        public Task RestartIceAsync(List<RTCIceServer> iceServers)
+        public Task UpdateIceServers(List<RTCIceServer> iceServers)
         {
-            throw new NotImplementedException();
+            if (isClosed)
+            {
+                throw new InvalidOperationException("Closed");
+            }
+            else if (iceServers == null || iceServers.Count < 0)
+            {
+                throw new ArgumentNullException("missing iceParameters");
+            }
+
+            return awaitQueue.Push(async () =>
+            {
+                await handlerInterface.UpdateIceServers(iceServers);
+                return new object();
+
+            }, "transport.UpdateIceServers");
+
         }
 
-        public Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new()
+        public async Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new()
         {
-            throw new NotImplementedException();
+            if (isClosed)
+            {
+                throw new InvalidOperationException("Closed");
+            } else if (options.track == null)
+            {
+                throw new ArgumentNullException("missing track");
+            } else if (direction != "send")
+            {
+                throw new InvalidOperationException("not a sending transport");
+            } else if (canProduceKind == null)// todo will write a better check system 
+            {
+                throw new InvalidOperationException($"cannot produce {options.track.Kind}");
+            } else if (options.track.ReadyState == TrackState.Ended)
+            {
+                throw new InvalidOperationException("track ended");
+            } else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
+            {
+                throw new Exception("no 'connect' listener set into this transport");
+            } else if (ListenerCount("produce") == 0 && connectionState == RTCIceConnectionState.New)
+            {
+                throw new Exception("no 'produce' listener set into this transport");
+            } else if (appData ==null) 
+            {
+                throw new InvalidCastException("if given, appData must be an object");
+            }
+
+            ProducerAppData tempAppData = null;
+
+            Producer<ProducerAppData> p = new Producer<ProducerAppData>(tempAppData);
+
+            await awaitQueue.Push(async () =>
+            {
+                List<RtpEncodingParameters> normalizedEncodings = new List<RtpEncodingParameters>();
+
+                if (options.encodings == null)
+                {
+                    throw new ArgumentException("encodings must be an arra");
+                } else if (options.encodings.Count == 0)
+                {
+                    normalizedEncodings = null;
+                } else if (options.encodings!=null) 
+                {
+                     normalizedEncodings = options.encodings.Select(encoding =>
+                    {
+                        RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters {active = true };
+
+                        if (!encoding.active) 
+                        {
+                            normalizedEncoding.active = false;
+                        }
+
+                        normalizedEncoding.dtx = encoding.dtx;
+                        normalizedEncoding.scalabilityMode = encoding.scalabilityMode;
+                        normalizedEncoding.scaleResolutionDownBy = encoding.scaleResolutionDownBy;
+                        normalizedEncoding.maxBitrate = encoding.maxBitrate;
+                        normalizedEncoding.maxFramerate = encoding.maxFramerate;
+                        normalizedEncoding.adaptivePtime = encoding.adaptivePtime;
+                        normalizedEncoding.priority = encoding.priority;
+                        normalizedEncoding.networkPriority = encoding.networkPriority;
+
+                        return normalizedEncoding;
+                    }).ToList();
+                }
+
+                HandlerSendOptions handlerSendOptions = new HandlerSendOptions
+                {
+                    track = options.track,
+                    codec = options.codec,
+                    codecOptions = options.codecOptions,
+                    encodings = normalizedEncodings
+                };
+
+                HandlerSendResult handlerSendResult = await handlerInterface.Send(handlerSendOptions);
+
+                Func<string> resolve;
+
+                try 
+                {
+                    Ortc.Ortc.ValidateRtpParameters(handlerSendResult.rtpParameters);
+
+                    int temp;
+
+                    int num = await SafeEmit<int>("produce", GetProducerId,(error) => { Debug.Log(""); });
+
+                } catch (Exception ex) 
+                {
+                
+                }
+
+                return p;
+            }, "transport.resumePendingConsumers");
+
+            return p;
+
         }
+
+        public async Task<int> GetProducerId() 
+        {
+            await Task.Delay(2000);
+            return 1;
+        }
+
+
 
         public Task<Producer<ConsumerAppData>> ConsumeAsync<ConsumerAppData>(ProducerOptions<ConsumerAppData> options = null) where ConsumerAppData : AppData, new()
         {
@@ -241,26 +377,136 @@ namespace Mediasoup.Transports
             throw new NotImplementedException();
         }
 
-        public void PausePendingConsumers()
+        public async Task PausePendingConsumers()
         {
-            throw new NotImplementedException();
+            consumerPauseInProgress = true;
+
+            try
+            {
+                await awaitQueue.Push(async () =>
+                {
+                    if (pendingPauseConsumers.Count == 0)
+                    {
+                        Console.WriteLine("pausePendingConsumers() | there is no Consumer to be paused");
+                        return new object();
+                    }
+
+                    var pendingPauseConsumersList = pendingPauseConsumers.Values.ToList();
+
+                    pendingPauseConsumers.Clear();
+
+                    try
+                    {
+                        List<string> localIds = pendingPauseConsumersList.Select(x => x.localId).ToList();
+                        await handlerInterface.ResumeReceiving(localIds);
+                        return new object();
+                    }
+                    catch (Exception error)
+                    {
+                        throw new Exception(error.Message);
+                    }
+                }, "transport.resumePendingConsumers");
+
+            }
+            finally
+            {
+                consumerPauseInProgress = false;
+
+                if (pendingPauseConsumers.Count > 0)
+                {
+                    await PausePendingConsumers();
+                }
+            }
         }
 
-        public void ResumePendingConsumers()
+        public async Task ResumePendingConsumers()
         {
-            throw new NotImplementedException();
+            consumerResumeInProgress = true;
+
+            try
+            {
+                await awaitQueue.Push(async () =>
+                {
+                    if (pendingResumeConsumers.Count == 0)
+                    {
+                        Console.WriteLine("resumePendingConsumers() | there is no Consumer to be resumed");
+                        return new object();
+                    }
+
+                    var pendingCloseConsumersList = pendingResumeConsumers.Values.ToList();
+
+                    pendingResumeConsumers.Clear();
+
+                    try
+                    {
+                        List<string> localIds = pendingCloseConsumersList.Select(x => x.localId).ToList();
+                        await handlerInterface.ResumeReceiving(localIds);
+                        return new object();
+                    }
+                    catch (Exception error)
+                    {
+                        throw new Exception(error.Message);
+                    }
+                }, "transport.resumePendingConsumers");
+
+            }
+            finally
+            {
+                consumerResumeInProgress = false;
+
+                if (pendingResumeConsumers.Count > 0)
+                {
+                    await ResumePendingConsumers();
+                }
+            }
         }
 
-        public void ClosePendingConsumers()
+        public async Task ClosePendingConsumers()
         {
-            throw new NotImplementedException();
+            consumerCloseInProgress = true;
+
+            try
+            {
+                await awaitQueue.Push(async () =>
+                {
+                    if (pendingCloseConsumers.Count==0)
+                    {
+                        Console.WriteLine("closePendingConsumers() | There is no Consumer to be closed");
+                        return new object();
+                    }
+
+                    var pendingCloseConsumersList = pendingCloseConsumers.Values.ToList();
+
+                    pendingCloseConsumers.Clear();
+
+                    try
+                    {
+                        List<string> localIds = pendingCloseConsumersList.Select(x => x.localId).ToList();
+                        await handlerInterface.StopReceiving(localIds);
+                        return new object();
+                    }
+                    catch (Exception error)
+                    {
+                        throw new Exception(error.Message);
+                    }
+                }, "transport.closePendingConsumers");
+
+            }
+            finally
+            {
+                consumerCloseInProgress = false;
+
+                if (pendingCloseConsumers.Count > 0)
+                {
+                    await ClosePendingConsumers();
+                }
+            }
+
         }
 
         private void HandleHandler() 
         {
-            HandlerInterface _handler = handlerInterface;
-
-            _handler.On("@connect", async (args) =>
+            handlerInterface.On("@connect", async (args) =>
             {
                 var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
                 DtlsParameters dtlsParams = parameters.Item1;
@@ -272,10 +518,10 @@ namespace Mediasoup.Transports
                     return;
                 }
 
-                _ = await _handler.SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
+                _ = await handlerInterface.SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
             });
 
-            _handler.On("@icegatheringstatechange", async (args) =>
+            handlerInterface.On("@icegatheringstatechange", async (args) =>
             {
                 RTCIceGatheringState _iceGatheringState = (RTCIceGatheringState)args[0];
 
@@ -288,11 +534,11 @@ namespace Mediasoup.Transports
 
                 if (!isClosed)
                 {
-                    _ = await _handler.SafeEmit("icegatheringstatechange", _iceGatheringState);
+                    _ = await handlerInterface.SafeEmit("icegatheringstatechange", _iceGatheringState);
                 }
             });
 
-            _handler.On("@connectionstatechange", async (args) =>
+            handlerInterface.On("@connectionstatechange", async (args) =>
             {
                 RTCIceConnectionState _connectionState = (RTCIceConnectionState)args[0];
 
@@ -305,7 +551,7 @@ namespace Mediasoup.Transports
 
                 if (!isClosed)
                 {
-                    _ = await _handler.SafeEmit("connectionstatechange", _connectionState);
+                    _ = await handlerInterface.SafeEmit("connectionstatechange", _connectionState);
                 }
             });
 
