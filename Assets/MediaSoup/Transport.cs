@@ -21,7 +21,7 @@ using Newtonsoft.Json.Converters;
 
 namespace Mediasoup.Transports
 {
-    public interface ITransport 
+    public interface ITransport
     {
         string id { get; }
         bool isClosed { get; }
@@ -33,8 +33,8 @@ namespace Mediasoup.Transports
         RTCIceGatheringState iceGatheringState { get; }
         RTCIceConnectionState connectionState { get; }
         object appData { get; }
-        Dictionary<string,IProducer> producers { get ; }
-        Dictionary<string,IConsumer> consumers { get; }
+        Dictionary<string, IProducer> producers { get; }
+        Dictionary<string, IConsumer> consumers { get; }
         Dictionary<string, IDataConsumer> dataConsumers { get; }
         Dictionary<string, IDataProducer> datapPorducers { get; }
         bool _probatorConsumerCreated { get; }
@@ -47,7 +47,7 @@ namespace Mediasoup.Transports
         Dictionary<string, IConsumer> pendingCloseConsumers { get; }
         bool consumerCloseInProgress { get; }
 
-        EnhancedEventEmitter observer { get; set; }
+        EnhancedEventEmitter<TransportObserverEvents> observer { get; set; }
 
         void Close();
         RTCStatsReport GetStats();
@@ -70,8 +70,6 @@ namespace Mediasoup.Transports
         void PausePendingConsumers();
         void ResumePendingConsumers();
         void ClosePendingConsumers();
-
-
 
     }
 
@@ -123,20 +121,20 @@ namespace Mediasoup.Transports
 
         public bool consumerCloseInProgress { get; private set; }
 
-        public EnhancedEventEmitter observer { get; set; }
+        public EnhancedEventEmitter<TransportObserverEvents> observer { get; set; }
 
         //Constructor
-        public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
-                        DtlsParameters _dtlsParameters,SctpParameters _sctpParameters,List<RTCIceServer> _iceServers,
-                        RTCIceTransportPolicy _iceTransportPolicy,object _additionalSettings, object _proprietaryConstraints,
+        public Transport(string _direction, string _id, IceParameters _iceParameters, List<IceCandidate> _iceCandidate,
+                        DtlsParameters _dtlsParameters, SctpParameters _sctpParameters, List<RTCIceServer> _iceServers,
+                        RTCIceTransportPolicy _iceTransportPolicy, object _additionalSettings, object _proprietaryConstraints,
                         TTransportAppData _appData, HandlerInterface handlerFactory, ExtendedRtpCapabilities _extendedRtpCapabilities,
-                        CanProduceByKind _canProduceKind) 
+                        CanProduceByKind _canProduceKind)
         {
             id = _id;
             direction = _direction;
             extendedRtpCapabilities = _extendedRtpCapabilities;
             canProduceKind = _canProduceKind;
-            maxSctpMessageSize = _sctpParameters != null? _sctpParameters.maxMessageSize:0;
+            maxSctpMessageSize = _sctpParameters != null ? _sctpParameters.maxMessageSize : 0;
 
             // Clone and sanitize additionalSettings.
             //additionalSettings = utils.clone(additionalSettings) || { };
@@ -179,7 +177,7 @@ namespace Mediasoup.Transports
 
             connectionState = RTCIceConnectionState.Closed;
 
-            foreach (var item in producers) 
+            foreach (var item in producers)
             {
                 item.Value.TransportClosed();
             }
@@ -211,9 +209,8 @@ namespace Mediasoup.Transports
 
         public RTCStatsReport GetStats()
         {
-            throw new NotImplementedException();
+            return null;
         }
-
         public Task RestartIceAsync(IceParameters iceParameters)
         {
             throw new NotImplementedException();
@@ -259,12 +256,64 @@ namespace Mediasoup.Transports
             throw new NotImplementedException();
         }
 
-        private void HandleHandler() 
+        private void HandleHandler()
         {
-        
+            HandlerInterface _handler = handlerInterface;
+
+            _handler.On("@connect", async (args) =>
+            {
+                var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
+                DtlsParameters dtlsParams = parameters.Item1;
+                var connectCallback = parameters.Item2;
+                var connectErrback = parameters.Item3;
+
+                if (isClosed)
+                {
+                    connectErrback("closed");
+                    return;
+                }
+
+                _ = await _handler.SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
+            });
+
+            _handler.On("@icegatheringstatechange", async (args) =>
+            {
+                RTCIceGatheringState _iceGatheringState = (RTCIceGatheringState)args[0];
+
+                if (iceGatheringState == _iceGatheringState)
+                {
+                    return;
+                }
+
+                iceGatheringState = _iceGatheringState;
+
+                if (!isClosed)
+                {
+                    _ = await _handler.SafeEmit("icegatheringstatechange", _iceGatheringState);
+                }
+            });
+
+            _handler.On("@connectionstatechange", async (args) =>
+            {
+                RTCIceConnectionState _connectionState = (RTCIceConnectionState)args[0];
+
+                if (connectionState == _connectionState)
+                {
+                    return;
+                }
+
+                connectionState = _connectionState;
+
+                if (!isClosed)
+                {
+                    _ = await _handler.SafeEmit("connectionstatechange", _connectionState);
+                }
+            });
+
+
         }
 
-        private void HandleProducer(Producer<AppData> _producer) 
+        private void HandleProducer(Producer<AppData> _producer)
         {
             _producer.On("@close", async _ =>
             {
@@ -290,7 +339,7 @@ namespace Mediasoup.Transports
 
         private void HandleDataConsumer(DataConsumer<AppData> _dataConsumer)
         {
-            _dataConsumer.On("@close", async _ => 
+            _dataConsumer.On("@close", async _ =>
             {
                 dataConsumers.Remove(_dataConsumer.id);
             });
@@ -312,7 +361,7 @@ namespace Mediasoup.Transports
         public TTransportAppData appData;
     }
 
-    
+
     public class CanProduceByKind
     {
         public bool audio;
@@ -321,7 +370,7 @@ namespace Mediasoup.Transports
     }
 
     [Serializable]
-    public class IceParameters 
+    public class IceParameters
     {
         public string usernameFragment;
         public string password;
@@ -329,7 +378,7 @@ namespace Mediasoup.Transports
     }
 
     [Serializable]
-    public class IceCandidate 
+    public class IceCandidate
     {
         public string foundation;
         public int priority;
@@ -342,13 +391,13 @@ namespace Mediasoup.Transports
     }
 
     [Serializable]
-    public class DtlsParameters 
+    public class DtlsParameters
     {
         public DtlsRole role;
         public List<DtlsFingerprint> fingerprints = new List<DtlsFingerprint>();
     }
 
-    public enum DtlsRole 
+    public enum DtlsRole
     {
         auto,
         client,
@@ -380,31 +429,31 @@ namespace Mediasoup.Transports
 
 
     [Serializable]
-    
-    public class DtlsFingerprint 
+
+    public class DtlsFingerprint
     {
         public FingerPrintAlgorithm algorithm;
         public string value;
     }
 
     [Serializable]
-    public class PlainRtpParameters 
+    public class PlainRtpParameters
     {
         public string ip;
         public string ipVersion; //
         public int port;
     }
 
-    public class TransportEvents 
+    public class TransportEvents
     {
-        public Tuple<Action<DtlsParameters>, Action<string>> Connect;
+        public Tuple<DtlsParameters, Action, Action<string>> Connect;
         public Action<RTCIceGatheringState> Icegatheringstatechange;
         public Action<RTCIceConnectionState> connectionstatechange;
         public Tuple<MediaKind, RtpParameters, object, Action<string>, Action<string>> Produce;
         public Tuple<SctpStreamParameters, string, string, object, Action<string>, Action<string>> ProduceData;
     }
 
-    public class TransportObserverEvents 
+    public class TransportObserverEvents
     {
         public List<object> Close { get; set; } = new();
         public Tuple<IProducer> Newproducer { get; set; }
@@ -413,7 +462,7 @@ namespace Mediasoup.Transports
         public Tuple<IDataConsumer> Newdataconsumer { get; set; }
     }
 
-    public class ConsumerCreationClass 
+    public class ConsumerCreationClass
     {
         public ConsumerOptions<object> consumerOptions;
 
@@ -421,7 +470,7 @@ namespace Mediasoup.Transports
         public Action<string> reject;
 
 
-        public ConsumerCreationClass(ConsumerOptions<object> _consumerOptions) 
+        public ConsumerCreationClass(ConsumerOptions<object> _consumerOptions)
         {
             consumerOptions = _consumerOptions;
         }
