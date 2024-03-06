@@ -5,6 +5,7 @@ using Unity.WebRTC;
 using System;
 using Mediasoup.RtpParameter;
 using Mediasoup.Internal;
+using Mediasoup.Types;
 
 namespace Mediasoup
 {
@@ -17,7 +18,7 @@ namespace Mediasoup
         RTCRtpSender rtpSender {get;}
         MediaStreamTrack track { get; }
         MediaKind kind { get; }
-        RtpParameters _rtpParameters { get; }
+        RtpParameters rtpParameters { get; }
 
         bool isPaused { get; }
         int maxSpatialLayer { get; }
@@ -41,7 +42,7 @@ namespace Mediasoup
 
     }
 
-    public class Producer<TProducerAppData> : EnhancedEventEmitter<ProducerEvents>, IProducer
+    public class Producer<TProducerAppData> : EnhancedEventEmitter<ProducerEvents>, IProducer where TProducerAppData:AppData
     {
         public string id { get; private set; }
 
@@ -55,7 +56,7 @@ namespace Mediasoup
 
         public MediaKind kind { get; private set; }
 
-        public RtpParameters _rtpParameters { get; private set; }
+        public RtpParameters rtpParameters { get; private set; }
 
         public bool isPaused { get; private set; }
 
@@ -71,8 +72,22 @@ namespace Mediasoup
 
         public EnhancedEventEmitter<ProducerObserverEvents> observer { get; set; }
 
-        public Producer(TProducerAppData? _appData)
+        public Producer(string _id,string _localId, RTCRtpSender _rtpSender,MediaStreamTrack _track,RtpParameters _rtpParameters,
+                   bool _stopTracks, bool _disableTrackOnPause, bool _zeroRtpOnPause, TProducerAppData? _appData)
         {
+
+            id = _id;
+            localId = _localId;
+            rtpSender = _rtpSender;
+            track = _track;
+            rtpParameters = _rtpParameters;
+            isPaused = !track.Enabled ? _disableTrackOnPause : false;
+            maxSpatialLayer = -1;
+            stopTracks = _stopTracks;
+            disableTrackOnPause = _disableTrackOnPause;
+            zeroRtpOnPause = _zeroRtpOnPause;
+
+
             if (_appData != null) appData = _appData ?? typeof(TProducerAppData).New<TProducerAppData>()!;
             observer = new EnhancedEventEmitter<ProducerObserverEvents>();
         }
@@ -92,7 +107,11 @@ namespace Mediasoup
         {
             if (track == null) return;
 
-            if (stopTracks) track.Stop();
+            if (stopTracks) 
+            {
+                track.Stop();
+                OnTrackEnded();
+            } 
         }
 
         public void Close()

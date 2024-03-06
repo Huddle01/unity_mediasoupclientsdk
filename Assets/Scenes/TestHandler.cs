@@ -4,15 +4,22 @@ using System.Collections.Generic;
 using UnityEngine;
 using Mediasoup.Transports;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 public class TestHandler : MonoBehaviour
 {
+    [SerializeField]
+    private RtpParameters rtpParam;
+
+    public string myname;
+
     // Start is called before the first frame update
     HandlerInterface handler;
 
     AwaitQueue awaitQueue;
     async void Start()
     {
+        GetJson();
         awaitQueue = new AwaitQueue();
         handler = new HandlerInterface("Unity");
         RegiserEvent();
@@ -30,6 +37,11 @@ public class TestHandler : MonoBehaviour
     void Update()
     {
         
+    }
+
+    private void GetJson() 
+    {
+        Debug.Log(JsonConvert.SerializeObject(rtpParam));
     }
 
     private void RegiserEvent() 

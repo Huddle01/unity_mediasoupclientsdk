@@ -3,6 +3,7 @@ using Mediasoup.RtpParameter;
 using Mediasoup.Internal;
 using System;
 using Unity.WebRTC;
+using Mediasoup.Types;
 
 namespace Mediasoup
 {
@@ -28,7 +29,7 @@ namespace Mediasoup
 
     }
 
-    public class Consumer<TConsumerAppData> : EnhancedEventEmitter<ConsumerEvents>, IConsumer
+    public class Consumer<TConsumerAppData> : EnhancedEventEmitter<ConsumerEvents>, IConsumer where TConsumerAppData: AppData
     {
         public object appData { get; private set; }
         public string id { get; set; }
@@ -152,14 +153,14 @@ namespace Mediasoup
         public string Close = "close";
     }
 
-    public class ConsumerOptions<TConsumerAppData>
+    public class ConsumerOptions
     {
         public string id;
         public string producerId;
         public string kind;  //'audio' | 'video'
         public RtpParameters rtpParameters;
         public string streamId;
-        public TConsumerAppData appData;
+        public AppData appData;
     }
 
     public class ConsumerObserverEvents 
