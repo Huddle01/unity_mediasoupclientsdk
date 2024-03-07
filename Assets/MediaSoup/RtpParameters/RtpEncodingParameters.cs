@@ -4,6 +4,8 @@ namespace Mediasoup.RtpParameter
 {
     public class RtpEncodingParameters
     {
+        public bool Active { get; set; }
+
         /// <summary>
         /// The media SSRC.
         /// </summary>

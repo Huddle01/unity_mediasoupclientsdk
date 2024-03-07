@@ -29,7 +29,7 @@ namespace Mediasoup.Transports
         string id { get; }
         bool isClosed { get; }
         string direction { get; }
-        object extendedRtpCapabilities { get; }
+        ExtendedRtpCapabilities extendedRtpCapabilities { get; }
         CanProduceByKind canProduceKind { get; }
         int maxSctpMessageSize { get; }
         HandlerInterface handlerInterface { get; }
@@ -84,7 +84,7 @@ namespace Mediasoup.Transports
 
         public string direction { get; private set; }
 
-        public object extendedRtpCapabilities { get; private set; }
+        public ExtendedRtpCapabilities extendedRtpCapabilities { get; private set; }
 
         public CanProduceByKind canProduceKind { get; private set; }
 
@@ -132,7 +132,7 @@ namespace Mediasoup.Transports
         public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
                         DtlsParameters _dtlsParameters,SctpParameters _sctpParameters,List<RTCIceServer> _iceServers,
                         RTCIceTransportPolicy _iceTransportPolicy,object _additionalSettings, object _proprietaryConstraints,
-                        TTransportAppData _appData, HandlerInterface handlerFactory,RtpCapabilities _extendedRtpCapabilities,
+                        TTransportAppData _appData, HandlerInterface handlerFactory, ExtendedRtpCapabilities _extendedRtpCapabilities,
                         CanProduceByKind _canProduceKind) 
         {
             id = _id;
@@ -301,19 +301,19 @@ namespace Mediasoup.Transports
                 {
                      normalizedEncodings = options.encodings.Select(encoding =>
                     {
-                        RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters {active = true };
+                        RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters {Active = true };
 
-                        if (!encoding.active) 
+                        if (!encoding.Active) 
                         {
-                            normalizedEncoding.active = false;
+                            normalizedEncoding.Active = false;
                         }
 
-                        normalizedEncoding.dtx = encoding.dtx;
-                        normalizedEncoding.scalabilityMode = encoding.scalabilityMode;
-                        normalizedEncoding.scaleResolutionDownBy = encoding.scaleResolutionDownBy;
-                        normalizedEncoding.maxBitrate = encoding.maxBitrate;
-                        normalizedEncoding.maxFramerate = encoding.maxFramerate;
-                        normalizedEncoding.adaptivePtime = encoding.adaptivePtime;
+                        normalizedEncoding.Dtx = encoding.Dtx;
+                        normalizedEncoding.ScalabilityMode = encoding.ScaleResolutionDownBy.Value.ToString();
+                        normalizedEncoding.ScaleResolutionDownBy = encoding.ScaleResolutionDownBy.Value;
+                        normalizedEncoding.MaxBitrate = encoding.MaxBitrate.Value;
+                        normalizedEncoding.MaxFramerate = encoding.MaxFramerate.Value;
+                        normalizedEncoding.AdaptivePtime = encoding.AdaptivePtime.Value;
                         normalizedEncoding.priority = encoding.priority;
                         normalizedEncoding.networkPriority = encoding.networkPriority;
 
@@ -332,7 +332,7 @@ namespace Mediasoup.Transports
                 HandlerSendResult handlerSendResult = await handlerInterface.Send(handlerSendOptions);
                 try 
                 {
-                    Ortc.Ortc.ValidateRtpParameters(handlerSendResult.rtpParameters);
+                    ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
 
                     //Adding a func param so that a method can be injected which can provide producer id
                     int num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters,appData);
@@ -387,7 +387,7 @@ namespace Mediasoup.Transports
                 throw new InvalidCastException("if given, appData must be an object");
             }
 
-            var canConsume = Ortc.Ortc.CanReceive();//Todo
+            var canConsume = ORTC.CanReceive(options.rtpParameters,extendedRtpCapabilities);
 
             if (!canConsume) 
             {
@@ -464,7 +464,7 @@ namespace Mediasoup.Transports
 
                 HandlerSendDataChannelResult sendDataResult = await handlerInterface.SendDataChannel(sendDataOption);
 
-                Ortc.Ortc.ValidateSctpParameters(sendDataResult.sctpStreamParameters);
+                ORTC.ValidateSctpStreamParameters(sendDataResult.sctpStreamParameters);
 
                 //Adding a func param so that a method can be injected which can provide producer id
                 int num = await GetProducerIdCallback.Invoke(sendDataResult.sctpStreamParameters,options.label, options.protocol, 
@@ -516,7 +516,7 @@ namespace Mediasoup.Transports
                 throw new ArgumentNullException("if given, appData must be an object");
             }
 
-            Ortc.Ortc.ValidateSctpParameters(options.sctpStreamParameters);
+            ORTC.ValidateSctpStreamParameters(options.sctpStreamParameters);
 
             await awaitQueue.Push(async () =>
             {
@@ -622,7 +622,7 @@ namespace Mediasoup.Transports
                 {
                     try 
                     {
-                        var probatorRtpParameters = Ortc.Ortc.GenerateProbatorRtpParameters();//Todo here
+                        var probatorRtpParameters = ORTC.GenerateProbatorRtpParameters(videoConsumerForProbator.rtpParameters);
 
                         _ = await handlerInterface.Receive(new List<HandlerReceiveOptions> 
                         {

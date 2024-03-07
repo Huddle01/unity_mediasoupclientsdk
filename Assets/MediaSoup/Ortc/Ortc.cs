@@ -1463,6 +1463,43 @@ namespace Mediasoup.Ortc
             return filteredCodecs;
         }
 
+        public static bool CanReceive(RtpParameters rtpParam,ExtendedRtpCapabilities extendedRtpCapabilities) 
+        {
+            ValidateRtpParameters(rtpParam);
+
+            if (rtpParam.Codecs.Count==0) 
+            {
+                return false;
+            }
+
+            var firstMediaCodec = rtpParam.Codecs[0];
+
+            return extendedRtpCapabilities.codecs.Any(codec => codec.remotePayloadType == firstMediaCodec.PayloadType);
+
+        }
+
+        public static RtpParameters GenerateProbatorRtpParameters(RtpParameters videoRtpParameters) 
+        {
+            RtpParameters result = Utils.Clone(videoRtpParameters);
+
+            ValidateRtpParameters(result);
+
+            RtpParameters rtpParameters = new RtpParameters 
+            {
+                Mid = "probator",
+                Codecs = new List<RtpCodecParameters>(),
+                HeaderExtensions = new List<RtpHeaderExtensionParameters>(),
+                Encodings = new List<RtpEncodingParameters> { new RtpEncodingParameters {Ssrc = 1234 } },
+                Rtcp = new RtcpParameters {CNAME = "probator" }
+            };
+
+            rtpParameters.Codecs.Add(videoRtpParameters.Codecs[0]);
+            rtpParameters.Codecs[0].PayloadType = 127;
+            rtpParameters.HeaderExtensions = videoRtpParameters.HeaderExtensions;
+
+            return rtpParameters;
+        }
+
     }
 
     public static class OrtcUtils
