@@ -322,6 +322,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d66863021db3d904ea2529908e2b4673, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  rtpParam:
+    mid: bcsjhbcv
+    codecs:
+    - mimeType: 
+      payloadType: 0
+      clockRate: 0
+      channels: 0
+      rtcpFeedback: []
+    headerExtensions: []
+    encodings: []
+    RtcpParameters:
+      cname: 
+      mux: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using Unity.WebRTC;
@@ -14,6 +15,8 @@ using Mediasoup;
 using System.Threading.Tasks;
 using Mediasoup.Types;
 using Newtonsoft.Json.Converters;
+using UnityEngine;
+using Mediasoup.Ortc;
 
 /// <summary>
 /// 
@@ -32,7 +35,7 @@ namespace Mediasoup.Transports
         HandlerInterface handlerInterface { get; }
         RTCIceGatheringState iceGatheringState { get; }
         RTCIceConnectionState connectionState { get; }
-        object appData { get; }
+        AppData appData { get; }
         Dictionary<string,IProducer> producers { get ; }
         Dictionary<string,IConsumer> consumers { get; }
         Dictionary<string, IDataConsumer> dataConsumers { get; }
@@ -52,28 +55,28 @@ namespace Mediasoup.Transports
         void Close();
         RTCStatsReport GetStats();
         Task RestartIceAsync(IceParameters iceParameters);
-        Task RestartIceAsync(List<RTCIceServer> iceServers);
+        Task UpdateIceServers(List<RTCIceServer> iceServers);
 
-        Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(
+        Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData,Task<int>> GetProducerIdCallback,
         ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new();
 
-        Task<Producer<ConsumerAppData>> ConsumeAsync<ConsumerAppData>(
-        ProducerOptions<ConsumerAppData> options = null) where ConsumerAppData : AppData, new();
+        Task<Consumer<AppData>> ConsumeAsync<ConsumerAppData>(
+        ConsumerOptions options = null) where ConsumerAppData : AppData, new();
 
-        Task<Producer<DataProducerAppData>> ProduceDataAsync<DataProducerAppData>(
-        ProducerOptions<DataProducerAppData> options = null) where DataProducerAppData : AppData, new();
+        Task<DataProducer<AppData>> ProduceDataAsync<DataProducerAppData>(Func<SctpStreamParameters, string, string,AppData, Task<int>> GetProducerIdCallback,
+        DataProducerOptions options = null) where DataProducerAppData : AppData, new();
 
-        Task<Producer<DataConsumerAppData>> ConsumeDataAsync<DataConsumerAppData>(
-        ProducerOptions<DataConsumerAppData> options = null) where DataConsumerAppData : AppData, new();
+        Task<DataConsumer<AppData>> ConsumeDataAsync<DataConsumerAppData>(
+        DataConsumerOptions options = null) where DataConsumerAppData : AppData, new();
 
 
-        void PausePendingConsumers();
-        void ResumePendingConsumers();
-        void ClosePendingConsumers();
+        Task PausePendingConsumers();
+        Task ResumePendingConsumers();
+        Task ClosePendingConsumers();
 
     }
 
-    public class Transport<TTransportAppData> : EnhancedEventEmitter<TransportEvents>, ITransport
+    public class Transport<TTransportAppData> : EnhancedEventEmitter<TransportEvents>, ITransport where TTransportAppData:AppData
     {
         public string id { get; private set; }
 
@@ -93,7 +96,7 @@ namespace Mediasoup.Transports
 
         public RTCIceConnectionState connectionState { get; private set; }
 
-        public object appData { get; private set; }
+        public AppData appData { get; private set; }
 
         public Dictionary<string, IProducer> producers { get; private set; }
 
@@ -122,6 +125,8 @@ namespace Mediasoup.Transports
         public bool consumerCloseInProgress { get; private set; }
 
         public EnhancedEventEmitter<TransportObserverEvents> observer { get; set; }
+
+        public AwaitQueue awaitQueue;
 
         //Constructor
         public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
@@ -157,6 +162,8 @@ namespace Mediasoup.Transports
             handlerRunOptions.additionalSettings = _additionalSettings;
             handlerRunOptions.proprietaryConstraints = _proprietaryConstraints;
             handlerRunOptions.extendedRtpCapabilities = _extendedRtpCapabilities;
+
+            awaitQueue = new AwaitQueue();
 
             handlerInterface.Run(handlerRunOptions);
             observer = new EnhancedEventEmitter<TransportObserverEvents>();
@@ -213,54 +220,572 @@ namespace Mediasoup.Transports
         }
         public Task RestartIceAsync(IceParameters iceParameters)
         {
-            throw new NotImplementedException();
+            if (isClosed) 
+            {
+                throw new InvalidOperationException("Closed");
+            }else if (iceParameters==null) 
+            {
+                throw new ArgumentNullException("missing iceParameters");
+            }
+
+            return awaitQueue.Push(async () => 
+            {
+                await handlerInterface.RestartIce(iceParameters);
+                return new object();
+
+            }, "transport.RestartIceAsync");
         }
 
-        public Task RestartIceAsync(List<RTCIceServer> iceServers)
+        public Task UpdateIceServers(List<RTCIceServer> iceServers)
         {
-            throw new NotImplementedException();
+            if (isClosed)
+            {
+                throw new InvalidOperationException("Closed");
+            }
+            else if (iceServers == null || iceServers.Count < 0)
+            {
+                throw new ArgumentNullException("missing iceParameters");
+            }
+
+            return awaitQueue.Push(async () =>
+            {
+                await handlerInterface.UpdateIceServers(iceServers);
+                return new object();
+
+            }, "transport.UpdateIceServers");
+
         }
 
-        public Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new()
+        public async Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<int>> GetProducerIdCallback, 
+                                    ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new()
         {
-            throw new NotImplementedException();
+            if (isClosed)
+            {
+                throw new InvalidOperationException("Closed");
+            } else if (options.track == null)
+            {
+                throw new ArgumentNullException("missing track");
+            } else if (direction != "send")
+            {
+                throw new InvalidOperationException("not a sending transport");
+            } else if (canProduceKind == null)// todo will write a better check system 
+            {
+                throw new InvalidOperationException($"cannot produce {options.track.Kind}");
+            } else if (options.track.ReadyState == TrackState.Ended)
+            {
+                throw new InvalidOperationException("track ended");
+            } else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
+            {
+                throw new Exception("no 'connect' listener set into this transport");
+            } else if (ListenerCount("produce") == 0 && connectionState == RTCIceConnectionState.New)
+            {
+                throw new Exception("no 'produce' listener set into this transport");
+            } else if (appData ==null) 
+            {
+                throw new InvalidCastException("if given, appData must be an object");
+            }
+
+            Producer<ProducerAppData> producer = null;
+
+            await awaitQueue.Push(async () =>
+            {
+                List<RtpEncodingParameters> normalizedEncodings = new List<RtpEncodingParameters>();
+
+                if (options.encodings == null)
+                {
+                    throw new ArgumentException("encodings must be an arra");
+                } else if (options.encodings.Count == 0)
+                {
+                    normalizedEncodings = null;
+                } else if (options.encodings!=null) 
+                {
+                     normalizedEncodings = options.encodings.Select(encoding =>
+                    {
+                        RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters {active = true };
+
+                        if (!encoding.active) 
+                        {
+                            normalizedEncoding.active = false;
+                        }
+
+                        normalizedEncoding.dtx = encoding.dtx;
+                        normalizedEncoding.scalabilityMode = encoding.scalabilityMode;
+                        normalizedEncoding.scaleResolutionDownBy = encoding.scaleResolutionDownBy;
+                        normalizedEncoding.maxBitrate = encoding.maxBitrate;
+                        normalizedEncoding.maxFramerate = encoding.maxFramerate;
+                        normalizedEncoding.adaptivePtime = encoding.adaptivePtime;
+                        normalizedEncoding.priority = encoding.priority;
+                        normalizedEncoding.networkPriority = encoding.networkPriority;
+
+                        return normalizedEncoding;
+                    }).ToList();
+                }
+
+                HandlerSendOptions handlerSendOptions = new HandlerSendOptions
+                {
+                    track = options.track,
+                    codec = options.codec,
+                    codecOptions = options.codecOptions,
+                    encodings = normalizedEncodings
+                };
+
+                HandlerSendResult handlerSendResult = await handlerInterface.Send(handlerSendOptions);
+                try 
+                {
+                    Ortc.Ortc.ValidateRtpParameters(handlerSendResult.rtpParameters);
+
+                    //Adding a func param so that a method can be injected which can provide producer id
+                    int num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters,appData);
+
+                    producer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId, 
+                        handlerSendResult.rtpSender,options.track, handlerSendResult.rtpParameters,options.stopTracks,
+                        options.disableTrackOnPause,options.zeroRtpOnPause, options.appData);
+
+                    producers.Add(producer.id, producer);
+                    HandleProducer(producer);
+
+                    _ = await observer.SafeEmit("newproducer",producer);
+                    return producer;
+
+                } catch (Exception ex) 
+                {
+                    throw new ArgumentException();
+                }
+            }, "transport.resumePendingConsumers");
+
+            return producer;
         }
 
-        public Task<Producer<ConsumerAppData>> ConsumeAsync<ConsumerAppData>(ProducerOptions<ConsumerAppData> options = null) where ConsumerAppData : AppData, new()
+        public async Task<Consumer<AppData>> ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null) where ConsumerAppData : AppData, new()
         {
-            throw new NotImplementedException();
+            if (isClosed)
+            {
+                throw new InvalidOperationException("Closed");
+            }
+            else if (direction != "recv")
+            {
+                throw new InvalidOperationException("not a sending transport");
+            }
+            else if (string.IsNullOrEmpty(options.id))
+            {
+                throw new ArgumentNullException("missing id");
+            } 
+            else if (string.IsNullOrEmpty(options.producerId))
+            {
+                throw new ArgumentNullException("missing producer id");
+            }
+            else if (options.kind != "audio" || options.kind != "video")
+            {
+                throw new ArgumentNullException("unsupported media kind");
+            }
+            else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New) 
+            {
+                throw new ArgumentNullException("no 'connect' listener set into this transport");
+            }
+            else if (appData == null)
+            {
+                throw new InvalidCastException("if given, appData must be an object");
+            }
+
+            var canConsume = Ortc.Ortc.CanReceive();//Todo
+
+            if (!canConsume) 
+            {
+                throw new InvalidOperationException("cannot comsume this producer");
+            }
+
+            var consumerCreationTask = new ConsumerCreationClass(options);
+
+            pendingConsumerTasks.Add(consumerCreationTask);
+
+            // There is no Consumer creation in progress, create it now.
+            _ = Task.Run(() =>
+              {
+                  if (isClosed)
+                  {
+                      return;
+                  }
+
+                  if (!consumerCreationInProgress)
+                  {
+                      CreatePendingConsumer<ConsumerAppData>();
+                  }
+              });
+
+            return await consumerCreationTask.Promise;
+
         }
 
-        public Task<Producer<DataProducerAppData>> ProduceDataAsync<DataProducerAppData>(ProducerOptions<DataProducerAppData> options = null) where DataProducerAppData : AppData, new()
+        public async Task<DataProducer<AppData>> ProduceDataAsync<DataProducerAppData>(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback,
+                                                        DataProducerOptions options = null) where DataProducerAppData : AppData, new()
         {
-            throw new NotImplementedException();
+
+            DataProducer<AppData> dataProducer = null;
+
+            if (isClosed)
+            {
+                throw new InvalidOperationException("Closed");
+            }
+            else if (direction != "send")
+            {
+                throw new InvalidOperationException("not a sending transport");
+            } else if (maxSctpMessageSize == -1)
+            {
+                throw new InvalidOperationException("SCTP not enabled by remote Transport");
+            } else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
+            {
+                throw new ArgumentNullException("no 'connect' listener set into this transport");
+            } else if (ListenerCount("produceData") == 0)
+            {
+                throw new ArgumentNullException("no 'producedata' listener set into this transport");
+            }
+            else if (appData == null)
+            {
+                throw new ArgumentNullException("if given, appData must be an object");
+            }
+
+
+            if (options.maxPacketLifeTime!=-1 || options.maxPacketLifeTime!=-1) 
+            {
+                options.ordered = false;
+            }
+
+             await awaitQueue.Push(async () =>
+            {
+
+                HandlerSendDataChannelOptions sendDataOption = new HandlerSendDataChannelOptions 
+                {
+                    ordered = options.ordered,
+                    maxPacketLifeTime = options.maxPacketLifeTime,
+                    maxRetransmits = options.maxRetransmits,
+                    label = options.label,
+                    protocol = options.protocol
+                };
+
+                HandlerSendDataChannelResult sendDataResult = await handlerInterface.SendDataChannel(sendDataOption);
+
+                Ortc.Ortc.ValidateSctpParameters(sendDataResult.sctpStreamParameters);
+
+                //Adding a func param so that a method can be injected which can provide producer id
+                int num = await GetProducerIdCallback.Invoke(sendDataResult.sctpStreamParameters,options.label, options.protocol, 
+                                                            options.dataConsumerAppData);
+
+                dataProducer = new DataProducer<AppData>(num.ToString(), sendDataResult.dataChannel,
+                                                        sendDataResult.sctpStreamParameters, options.dataConsumerAppData);
+
+                datapPorducers.Add(dataProducer.id,dataProducer);
+                HandleDataProducer(dataProducer);
+                _ = observer.SafeEmit("newdataproducer", datapPorducers);
+                return dataProducer;
+
+            }, "transport.produceData()");
+
+            return dataProducer;
         }
 
-        public Task<Producer<DataConsumerAppData>> ConsumeDataAsync<DataConsumerAppData>(ProducerOptions<DataConsumerAppData> options = null) where DataConsumerAppData : AppData, new()
+        public async Task<DataConsumer<AppData>> ConsumeDataAsync<DataConsumerAppData>(DataConsumerOptions options = null) where DataConsumerAppData : AppData, new()
         {
-            throw new NotImplementedException();
+            SctpStreamParameters sctpStreamParams = Utils.Clone<SctpStreamParameters>(options.sctpStreamParameters);
+
+            DataConsumer<AppData> dataConsumer = null;
+
+            if (isClosed)
+            {
+                throw new InvalidOperationException("Closed");
+            }
+            else if (direction != "recv")
+            {
+                throw new InvalidOperationException("not a sending transport");
+            }
+            else if (maxSctpMessageSize == -1)
+            {
+                throw new InvalidOperationException("SCTP not enabled by remote Transport");
+            } else if (string.IsNullOrEmpty(options.id))
+            {
+                throw new ArgumentNullException("missing id");
+            } else if (string.IsNullOrEmpty(options.datProducerId)) 
+            {
+                throw new ArgumentNullException("missing data producer id");
+            }
+            else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
+            {
+                throw new ArgumentNullException("no 'connect' listener set into this transport");
+            }
+            else if (appData == null)
+            {
+                throw new ArgumentNullException("if given, appData must be an object");
+            }
+
+            Ortc.Ortc.ValidateSctpParameters(options.sctpStreamParameters);
+
+            await awaitQueue.Push(async () =>
+            {
+                HandlerReceiveDataChannelOptions sendDataoption = new HandlerReceiveDataChannelOptions 
+                {
+                    label = options.label,
+                    protocol = options.protocol,
+                    sctpStreamParameters = options.sctpStreamParameters
+                };
+
+                RTCDataChannel sendDataResult = await handlerInterface.ReceiveDataChannel(sendDataoption);
+
+
+                dataConsumer = new DataConsumer<AppData>(options.id, options.datProducerId,
+                                                        sendDataResult, options.sctpStreamParameters,options.dataConsumerAppData);
+
+                dataConsumers.Add(dataConsumer.id, dataConsumer);
+                HandleDataConsumer(dataConsumer);
+                _ = observer.SafeEmit("newdataconsumer", dataConsumer);
+                return dataConsumers;
+
+            }, "transport.produceData()");
+
+            return dataConsumer;
         }
 
-        public void PausePendingConsumers()
+        public async Task CreatePendingConsumer<ConsumerAppData>() where ConsumerAppData:AppData
         {
-            throw new NotImplementedException();
+            await awaitQueue.Push(async () =>
+            {
+                if (pendingConsumerTasks.Count==0) 
+                {
+                    Debug.LogError("createPendingConsumers() | there is no Consumer to be created");
+                    return new object();
+                }
+
+
+                List<ConsumerCreationClass> tempPendingConsumerTask = new List<ConsumerCreationClass>(pendingConsumerTasks);
+                pendingConsumerTasks.Clear();
+
+                Consumer<AppData> videoConsumerForProbator = null;
+
+                List<HandlerReceiveOptions> optionsList = new List<HandlerReceiveOptions>();
+
+                foreach (ConsumerCreationClass task in tempPendingConsumerTask)
+                {
+                    HandlerReceiveOptions tempOption = new HandlerReceiveOptions 
+                    {
+                        kind = task.ConsumerOptions.kind,
+                        streamId = task.ConsumerOptions.streamId,
+                        rtpParameters = task.ConsumerOptions.rtpParameters,
+                        trackId = task.ConsumerOptions.id
+                    };
+
+                    optionsList.Add(tempOption);
+                }
+
+                try 
+                {
+                    List<HandlerReceiveResult> results = await handlerInterface.Receive(optionsList);
+
+                    for (int i = 0; i < results.Count; i++)
+                    {
+                        ConsumerCreationClass task = tempPendingConsumerTask[i];
+                        HandlerReceiveResult result = results[i];
+
+                        var tempId = task.ConsumerOptions.id;
+                        var tempProducerId = task.ConsumerOptions.producerId;
+                        var tempkind = task.ConsumerOptions.kind;
+                        var tempRtpParam = task.ConsumerOptions.rtpParameters;
+                        var tempAppData = task.ConsumerOptions.appData;
+
+                        var tempLocalId = result.localId;
+                        var tempRtpReceiver = result.rtpReceiver;
+                        var tempTrack = result.track;
+
+                        Consumer<AppData> tempConsumer = new Consumer<AppData>(tempId,tempLocalId,tempProducerId,
+                                                            tempRtpReceiver,tempTrack, tempRtpParam, tempAppData);
+
+                        consumers.Add(tempConsumer.id,tempConsumer);
+                        HandleConsumer(tempConsumer);
+
+                        if (!_probatorConsumerCreated && videoConsumerForProbator!=null && tempkind=="video")
+                        {
+                            videoConsumerForProbator = tempConsumer;
+                        }
+
+                        _ = observer.SafeEmit("newconsumer",tempConsumer);
+
+                        task.ResolveConsumer(tempConsumer);
+
+                    }
+
+                } catch (Exception ex) 
+                {
+                    foreach (var task in pendingConsumerTasks)
+                    {
+                        task.RejectWithError(new Exception("Rejecting consumer"));
+                    }
+                }
+
+                if (videoConsumerForProbator!=null) 
+                {
+                    try 
+                    {
+                        var probatorRtpParameters = Ortc.Ortc.GenerateProbatorRtpParameters();//Todo here
+
+                        _ = await handlerInterface.Receive(new List<HandlerReceiveOptions> 
+                        {
+                            new HandlerReceiveOptions
+                            {
+                                trackId = "probator",
+                                kind = "video",
+                                rtpParameters = probatorRtpParameters
+                            }
+                        });
+
+                        _probatorConsumerCreated = true;
+
+                    } 
+                    catch (Exception ex) 
+                    {
+                        throw new Exception("createPendingConsumers() | failed to create Consumer for RTP probation");
+                    }
+                }
+
+                return new object();
+            }, "transport.produceData()").ContinueWith(task=> 
+            {
+                consumerCreationInProgress = false;
+
+                if (pendingConsumerTasks.Count>0) 
+                {
+                    CreatePendingConsumer<AppData>();
+                }
+
+            });
         }
 
-        public void ResumePendingConsumers()
+        public async Task PausePendingConsumers()
         {
-            throw new NotImplementedException();
+            consumerPauseInProgress = true;
+
+            try
+            {
+                await awaitQueue.Push(async () =>
+                {
+                    if (pendingPauseConsumers.Count == 0)
+                    {
+                        Console.WriteLine("pausePendingConsumers() | there is no Consumer to be paused");
+                        return new object();
+                    }
+
+                    var pendingPauseConsumersList = pendingPauseConsumers.Values.ToList();
+
+                    pendingPauseConsumers.Clear();
+
+                    try
+                    {
+                        List<string> localIds = pendingPauseConsumersList.Select(x => x.localId).ToList();
+                        await handlerInterface.ResumeReceiving(localIds);
+                        return new object();
+                    }
+                    catch (Exception error)
+                    {
+                        throw new Exception(error.Message);
+                    }
+                }, "transport.resumePendingConsumers");
+
+            }
+            finally
+            {
+                consumerPauseInProgress = false;
+
+                if (pendingPauseConsumers.Count > 0)
+                {
+                    await PausePendingConsumers();
+                }
+            }
         }
 
-        public void ClosePendingConsumers()
+        public async Task ResumePendingConsumers()
         {
-            throw new NotImplementedException();
+            consumerResumeInProgress = true;
+
+            try
+            {
+                await awaitQueue.Push(async () =>
+                {
+                    if (pendingResumeConsumers.Count == 0)
+                    {
+                        Console.WriteLine("resumePendingConsumers() | there is no Consumer to be resumed");
+                        return new object();
+                    }
+
+                    var pendingCloseConsumersList = pendingResumeConsumers.Values.ToList();
+
+                    pendingResumeConsumers.Clear();
+
+                    try
+                    {
+                        List<string> localIds = pendingCloseConsumersList.Select(x => x.localId).ToList();
+                        await handlerInterface.ResumeReceiving(localIds);
+                        return new object();
+                    }
+                    catch (Exception error)
+                    {
+                        throw new Exception(error.Message);
+                    }
+                }, "transport.resumePendingConsumers");
+
+            }
+            finally
+            {
+                consumerResumeInProgress = false;
+
+                if (pendingResumeConsumers.Count > 0)
+                {
+                    await ResumePendingConsumers();
+                }
+            }
+        }
+
+        public async Task ClosePendingConsumers()
+        {
+            consumerCloseInProgress = true;
+
+            try
+            {
+                await awaitQueue.Push(async () =>
+                {
+                    if (pendingCloseConsumers.Count==0)
+                    {
+                        Console.WriteLine("closePendingConsumers() | There is no Consumer to be closed");
+                        return new object();
+                    }
+
+                    var pendingCloseConsumersList = pendingCloseConsumers.Values.ToList();
+
+                    pendingCloseConsumers.Clear();
+
+                    try
+                    {
+                        List<string> localIds = pendingCloseConsumersList.Select(x => x.localId).ToList();
+                        await handlerInterface.StopReceiving(localIds);
+                        return new object();
+                    }
+                    catch (Exception error)
+                    {
+                        throw new Exception(error.Message);
+                    }
+                }, "transport.closePendingConsumers");
+
+            }
+            finally
+            {
+                consumerCloseInProgress = false;
+
+                if (pendingCloseConsumers.Count > 0)
+                {
+                    await ClosePendingConsumers();
+                }
+            }
+
         }
 
         private void HandleHandler() 
         {
-            HandlerInterface _handler = handlerInterface;
-
-            _handler.On("@connect", async (args) =>
+            handlerInterface.On("@connect", async (args) =>
             {
                 var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
                 DtlsParameters dtlsParams = parameters.Item1;
@@ -272,10 +797,10 @@ namespace Mediasoup.Transports
                     return;
                 }
 
-                _ = await _handler.SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
+                _ = await handlerInterface.SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
             });
 
-            _handler.On("@icegatheringstatechange", async (args) =>
+            handlerInterface.On("@icegatheringstatechange", async (args) =>
             {
                 RTCIceGatheringState _iceGatheringState = (RTCIceGatheringState)args[0];
 
@@ -288,11 +813,11 @@ namespace Mediasoup.Transports
 
                 if (!isClosed)
                 {
-                    _ = await _handler.SafeEmit("icegatheringstatechange", _iceGatheringState);
+                    _ = await handlerInterface.SafeEmit("icegatheringstatechange", _iceGatheringState);
                 }
             });
 
-            _handler.On("@connectionstatechange", async (args) =>
+            handlerInterface.On("@connectionstatechange", async (args) =>
             {
                 RTCIceConnectionState _connectionState = (RTCIceConnectionState)args[0];
 
@@ -305,14 +830,14 @@ namespace Mediasoup.Transports
 
                 if (!isClosed)
                 {
-                    _ = await _handler.SafeEmit("connectionstatechange", _connectionState);
+                    _ = await handlerInterface.SafeEmit("connectionstatechange", _connectionState);
                 }
             });
 
 
         }
 
-        private void HandleProducer(Producer<AppData> _producer) 
+        private void HandleProducer<TAppData>(Producer<TAppData> _producer) where TAppData: AppData
         {
             _producer.On("@close", async _ =>
             {
@@ -461,18 +986,29 @@ namespace Mediasoup.Transports
         public Tuple<IDataConsumer> Newdataconsumer { get; set; }
     }
 
-    public class ConsumerCreationClass 
+    public class ConsumerCreationClass
     {
-        public ConsumerOptions<object> consumerOptions;
+        public ConsumerOptions ConsumerOptions { get; }
+        public Task<Consumer<AppData>> Promise { get; }
+        private TaskCompletionSource<Consumer<AppData>> TaskCompletionSource { get; } = new TaskCompletionSource<Consumer<AppData>>();
 
-        public Action<IConsumer> resolve;
-        public Action<string> reject;
 
-
-        public ConsumerCreationClass(ConsumerOptions<object> _consumerOptions) 
+        public ConsumerCreationClass(ConsumerOptions consumerOptions)
         {
-            consumerOptions = _consumerOptions;
+            ConsumerOptions = consumerOptions;
+            Promise = TaskCompletionSource.Task;
         }
+
+        public void ResolveConsumer(Consumer<AppData> consumer)
+        {
+            TaskCompletionSource.TrySetResult(consumer);
+        }
+
+        public void RejectWithError(Exception error)
+        {
+            TaskCompletionSource.TrySetException(new TaskCanceledException("Consumer creation failed", error));
+        }
+
     }
 
 }

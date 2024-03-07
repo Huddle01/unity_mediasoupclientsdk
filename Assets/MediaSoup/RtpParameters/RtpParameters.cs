@@ -71,6 +71,7 @@ namespace Mediasoup.RtpParameter
     [Serializable]
     public class RtpEncodingParameters 
     {
+        public bool active;
         public int ssrc;
         public string rid;
         public int codecPayloadType;
@@ -83,6 +84,7 @@ namespace Mediasoup.RtpParameter
         public string priority;
         public string networkPriority;
         public RtxParameters? rtx;
+
 
         /*
          priority?: 'very-low' | 'low' | 'medium' | 'high';

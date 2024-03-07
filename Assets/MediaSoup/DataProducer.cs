@@ -4,6 +4,7 @@ using UnityEngine;
 using Unity.WebRTC;
 using Mediasoup.SctpParameter;
 using Mediasoup.Internal;
+using Mediasoup.Types;
 
 namespace Mediasoup.DataProducers 
 {
@@ -24,15 +25,15 @@ namespace Mediasoup.DataProducers
 
     public class DataProducer<TDataProducerAppData> : EnhancedEventEmitter<DataProducerEvents>, IDataProducer
     {
-        public string id { get; private set; }
+        public string id { get; set; }
 
-        public RTCDataChannel dataChannel { get; private set; }
+        public RTCDataChannel dataChannel { get; set; }
 
         public bool isClosed { get; private set; }
 
-        public SctpStreamParameters sctpStreamParameters { get; private set; }
+        public SctpStreamParameters sctpStreamParameters { get; set; }
 
-        public object dataProducerAppData { get; private set; }
+        public object dataProducerAppData { get; set; }
 
         public EnhancedEventEmitter<DataProducerEvents> observer { get; private set; }
 
@@ -154,14 +155,14 @@ namespace Mediasoup.DataProducers
         
     }
 
-    public class DataProducerOptions<TDataProducerAppData>
+    public class DataProducerOptions
     {
         public bool ordered;
         public int maxPacketLifeTime;
         public int maxRetransmits;
         public string label;
         public string protocol;
-        public TDataProducerAppData dataConsumerAppData;
+        public AppData dataConsumerAppData;
     }
 
     public class DataProducerEvents

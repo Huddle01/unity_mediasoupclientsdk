@@ -56,9 +56,6 @@ namespace UtilmeSdpTransform
         public bool Paused { get; set; }
     }
 
-
-
-
 }
 
 

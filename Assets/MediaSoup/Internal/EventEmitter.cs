@@ -109,8 +109,9 @@ namespace Mediasoup.Internal
             Debug.Log($"{name} Does exist");
             if (handlers == null) Debug.Log($"handler is null");
             await handlers.Invoke(data);
-            
         }
+
+
 
         protected int ListenerCount(string name) => namedHandlers.TryGetValue(name, out var list)
             ? list!.GetInvocationList().Length
