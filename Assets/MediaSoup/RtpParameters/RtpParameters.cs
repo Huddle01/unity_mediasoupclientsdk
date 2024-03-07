@@ -76,12 +76,12 @@ namespace Mediasoup.RtpParameter
         public MediaKind kind;
         public uint clockRate;
         public byte? channels;
-        public byte localPayloadType;
+        public byte? localPayloadType;
         public byte? localRtxPayloadType;
-        public byte remotePayloadType;
+        public byte? remotePayloadType;
         public byte? remoteRtxPayloadType;
-        public Dictionary<string, object> localParameters;
-        public Dictionary<string, object> remoteParameters;
+        public IDictionary<string, object>? localParameters;
+        public IDictionary<string, object>? remoteParameters;
         public List<RtcpFeedback> rtcpFeedback = new List<RtcpFeedback>();
     }
 

@@ -1017,7 +1017,7 @@ public class HandlerRunOptions
     public DtlsParameters dtlsParameters;
     public SctpParameters sctpParameters;
     public List<RTCIceServer> iceServers;
-    public RTCIceTransportPolicy iceTransportPolicy;
+    public RTCIceTransportPolicy? iceTransportPolicy;
     public object additionalSettings;
     public object proprietaryConstraints;
     public ExtendedRtpCapabilities extendedRtpCapabilities;

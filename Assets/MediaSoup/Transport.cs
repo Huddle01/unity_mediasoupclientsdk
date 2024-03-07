@@ -30,7 +30,7 @@ namespace Mediasoup.Transports
         bool isClosed { get; }
         string direction { get; }
         ExtendedRtpCapabilities extendedRtpCapabilities { get; }
-        CanProduceByKind canProduceKind { get; }
+        Dictionary<MediaKind, bool> canProduceKind { get; }
         int maxSctpMessageSize { get; }
         HandlerInterface handlerInterface { get; }
         RTCIceGatheringState iceGatheringState { get; }
@@ -86,7 +86,7 @@ namespace Mediasoup.Transports
 
         public ExtendedRtpCapabilities extendedRtpCapabilities { get; private set; }
 
-        public CanProduceByKind canProduceKind { get; private set; }
+        public Dictionary<MediaKind, bool> canProduceKind { get; private set; }
 
         public int maxSctpMessageSize { get; private set; }
 
@@ -131,9 +131,9 @@ namespace Mediasoup.Transports
         //Constructor
         public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
                         DtlsParameters _dtlsParameters,SctpParameters _sctpParameters,List<RTCIceServer> _iceServers,
-                        RTCIceTransportPolicy _iceTransportPolicy,object _additionalSettings, object _proprietaryConstraints,
+                        RTCIceTransportPolicy? _iceTransportPolicy,object _additionalSettings, object _proprietaryConstraints,
                         TTransportAppData _appData, HandlerInterface handlerFactory, ExtendedRtpCapabilities _extendedRtpCapabilities,
-                        CanProduceByKind _canProduceKind) 
+                        Dictionary<MediaKind, bool> _canProduceKind) 
         {
             id = _id;
             direction = _direction;
@@ -886,13 +886,7 @@ namespace Mediasoup.Transports
     }
 
     
-    public class CanProduceByKind
-    {
-        public bool audio;
-        public bool video;
-        Dictionary<string, bool> booleanDictionary = new Dictionary<string, bool>();
-    }
-
+ 
     [Serializable]
     public class IceParameters 
     {

@@ -6,7 +6,9 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Mediasoup.RtpParameter;
 using Mediasoup.SctpParameter;
+using Mediasoup.Transports;
 using Unity.WebRTC;
+using Utilme.SdpTransform;
 
 namespace Mediasoup.Ortc
 {
@@ -15,6 +17,11 @@ namespace Mediasoup.Ortc
         private static readonly Regex MimeTypeRegex = new("^(audio|video)/(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex RtxMimeTypeRegex = new("^.+/rtx$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        private static readonly Regex ProtocolRegex = new Regex("(udp|tcp)", RegexOptions.ECMAScript |  RegexOptions.IgnoreCase);
+        private static readonly Regex TypeRegex = new Regex("(host|srflx|prflx|relay)", RegexOptions.ECMAScript |  RegexOptions.IgnoreCase);
+        private static readonly Regex RoleRegex = new Regex("(auto|client|server)", RegexOptions.ECMAScript | RegexOptions.IgnoreCase);
+
 
         public static readonly byte[] DynamicPayloadTypes = new byte[] {
             100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
@@ -115,6 +122,11 @@ namespace Mediasoup.Ortc
             }
         }
 
+        public static bool CanSend(MediaKind kind, ExtendedRtpCapabilities rtpCapabilities)
+        {
+            return rtpCapabilities.codecs.Exists(codec => codec.kind == kind);
+        }
+
         /// <summary>
         /// Validates RtcpFeedback. It may modify given data by adding missing
         /// fields with default values.
@@ -167,7 +179,7 @@ namespace Mediasoup.Ortc
             //     ext.PreferredEncrypt = false;
             // }
 
-            // direction is optional. If unset set it to sendrecv.
+            // direction is optional. If unset set it to SendReceive.
             if (!ext.Direction.HasValue)
             {
                 ext.Direction = RtpHeaderExtensionDirection.SendReceive;
@@ -587,6 +599,62 @@ namespace Mediasoup.Ortc
             return caps;
         }
 
+        public static void ValidateIceParameters(IceParameters iceParameters) {
+            string usernameFragmentIt = iceParameters.usernameFragment;
+            string passwordIt = iceParameters.password;
+            bool iceLiteIt = iceParameters.iceLite;
+
+            // usernameFragment is mandatory
+            if (usernameFragmentIt == null) {
+                throw new ArgumentException("ORTC: Missing username Fragment in IceParameters");
+            }
+
+            // passwordIt is mandatory
+            if (passwordIt == null)
+            {
+                throw new ArgumentException("ORTC: Missing passwordIt Fragment in IceParameters");
+            }
+        }
+
+        public static void ValidateIceCandidate(IceCandidate candidate) {
+            if (candidate == null)
+                throw new ArgumentNullException(nameof(candidate));
+
+            if (string.IsNullOrEmpty(candidate.foundation))
+                throw new ArgumentException("missing foundation");
+
+            if (candidate.priority <= 0)
+                throw new ArgumentException("priority must be a positive integer");
+
+            if (string.IsNullOrEmpty(candidate.ip))
+                throw new ArgumentException("missing ip");
+
+            if (string.IsNullOrEmpty(candidate.protocol))
+                throw new ArgumentException("missing protocol");
+
+            if (!ProtocolRegex.IsMatch(candidate.protocol))
+                throw new ArgumentException("invalid protocol");
+
+            if (candidate.port <= 0)
+                throw new ArgumentException("port must be a positive integer");
+
+            if (string.IsNullOrEmpty(candidate.type))
+                throw new ArgumentException("missing type");
+
+            if (!TypeRegex.IsMatch(candidate.type))
+                throw new ArgumentException("invalid type");
+        }
+
+        public static void ValidateIceCandidates(List<IceCandidate> iceCandidates) {
+            if (iceCandidates == null || iceCandidates.Count == 0) {
+                throw new ArgumentException("Ice Candidates cannot be null or empty");
+            }
+
+            foreach (IceCandidate candidate in iceCandidates) {
+                ValidateIceCandidate(candidate);
+            }
+        }
+        
         /// <summary>
         /// <para>
         /// Get a mapping in codec payloads and encodings in the given Producer RTP
@@ -1214,7 +1282,7 @@ namespace Mediasoup.Ortc
                 RtpCodecParameters codec = new RtpCodecParameters
                 {
                     MimeType = extendedCodec.mimeType,
-                    PayloadType = extendedCodec.localPayloadType,
+                    PayloadType = extendedCodec.localPayloadType.Value,
                     ClockRate = extendedCodec.clockRate,
                     Channels = extendedCodec.channels,
                     Parameters = extendedCodec.remoteParameters,
@@ -1377,7 +1445,7 @@ namespace Mediasoup.Ortc
                 RtpCodecParameters codec = new RtpCodecParameters
                 {
                     MimeType = extendedCodec.mimeType,
-                    PayloadType = extendedCodec.localPayloadType,
+                    PayloadType = extendedCodec.localPayloadType.Value,
                     ClockRate = extendedCodec.clockRate,
                     Channels = extendedCodec.channels,
                     Parameters = extendedCodec.localParameters,
@@ -1461,6 +1529,165 @@ namespace Mediasoup.Ortc
             }
             
             return filteredCodecs;
+        }
+
+        private static bool IsRtxCodec(RtpCodecCapability codec) {
+            if (codec == null) return false;
+            return IsRtxMimeType(codec.MimeType);
+        }
+
+        public static ExtendedRtpCapabilities GetExtendedRtpCapabilities(RtpCapabilities localCaps, RtpCapabilities remoteCaps)
+        {
+            ExtendedRtpCapabilities extendedRtpCapabilities = new ExtendedRtpCapabilities();
+
+            foreach (RtpCodecCapability remoteCodec in remoteCaps.Codecs)
+            {
+                if (remoteCodec != null && IsRtxMimeType(remoteCodec.MimeType))
+                {
+                    continue;
+                }
+
+                RtpCodecCapability matchingLocalCodec = null;
+                if (localCaps.Codecs != null)
+                {
+                    foreach (RtpCodecCapability localCodec in localCaps.Codecs)
+                    {
+                        if (MatchCodecs(localCodec, remoteCodec, true, true))
+                        {
+                            matchingLocalCodec = localCodec;
+                            break;
+                        }
+                    }
+                }
+
+                if (matchingLocalCodec == null)
+                {
+                    continue;
+                }
+
+                ExtendedRtpCodecCapability extendedCodec = new ExtendedRtpCodecCapability
+                {
+                    mimeType = matchingLocalCodec.MimeType,
+                    kind = matchingLocalCodec.Kind,
+                    clockRate = matchingLocalCodec.ClockRate,
+                    channels = matchingLocalCodec.Channels,
+                    localPayloadType = matchingLocalCodec.PreferredPayloadType,
+                    remotePayloadType = remoteCodec.PreferredPayloadType,
+                    localParameters = matchingLocalCodec.Parameters,
+                    remoteParameters = remoteCodec.Parameters,
+                    rtcpFeedback = ReduceRtcpFeedback(matchingLocalCodec, remoteCodec),
+                };
+
+                extendedRtpCapabilities.codecs.Add(extendedCodec);
+            }
+
+            foreach (ExtendedRtpCodecCapability extendedCodec in extendedRtpCapabilities.codecs)
+            {
+                {
+
+                    RtpCodecCapability matchingLocalRtxCodec = null;
+                    foreach (RtpCodecCapability localCodec in localCaps.Codecs)
+                    {
+                        if (localCodec != null && IsRtxMimeType(localCodec.MimeType) && Int32.Parse((string) localCodec.Parameters["apt"]) == extendedCodec.localPayloadType)
+                        {
+                            matchingLocalRtxCodec = localCodec;
+                            break;
+                        }
+                    }
+
+                    RtpCodecCapability matchingRemoteRtxCodec = remoteCaps.Codecs.First(codec => IsRtxCodec(codec)
+                    && (byte) codec.Parameters["apt"] == extendedCodec.localPayloadType);
+
+                    if (matchingLocalRtxCodec != null && matchingRemoteRtxCodec != null)
+                    {
+                        extendedCodec.localRtxPayloadType = matchingLocalRtxCodec.PreferredPayloadType;
+                        extendedCodec.remoteRtxPayloadType = matchingRemoteRtxCodec.PreferredPayloadType;
+                    }
+                }
+            }
+
+            foreach (RtpHeaderExtension remoteExt in remoteCaps.HeaderExtensions)
+            {
+                RtpHeaderExtension matchingLocalExt = localCaps.HeaderExtensions.First(ext => MatchHeaderExtensions(ext, remoteExt));
+
+                if (matchingLocalExt == null) continue;
+
+                ExtendedRtpHeaderExtension extendedExt = new ExtendedRtpHeaderExtension
+                {
+                    Kind = remoteExt.Kind,
+                    Uri = remoteExt.Uri,
+                    sendId = matchingLocalExt.PreferredId,
+                    recvId = remoteExt.PreferredId,
+                    PreferredEncrypt = matchingLocalExt.PreferredEncrypt,
+                    Direction = RtpHeaderExtensionDirection.SendReceive
+                };
+
+                switch (remoteExt.Direction)
+                {
+
+                    case (RtpHeaderExtensionDirection.SendReceive):
+                        {
+                            extendedExt.Direction = RtpHeaderExtensionDirection.SendReceive;
+                            break;
+                        }
+                    case (RtpHeaderExtensionDirection.ReceiveOnly):
+                        {
+                            extendedExt.Direction = RtpHeaderExtensionDirection.SendOnly;
+                            break;
+                        }
+                    case (RtpHeaderExtensionDirection.SendOnly):
+                        {
+                            extendedExt.Direction = RtpHeaderExtensionDirection.ReceiveOnly;
+                            break;
+                        }
+                    case (RtpHeaderExtensionDirection.Inactive):
+                        {
+                            extendedExt.Direction = RtpHeaderExtensionDirection.Inactive;
+                            break;
+                        }
+                }
+
+                extendedRtpCapabilities.headerExtensions.Add(extendedExt);
+
+            }
+
+
+            return extendedRtpCapabilities;
+        }
+
+        private static bool MatchHeaderExtensions(RtpHeaderExtension a, RtpHeaderExtension b)
+        {
+            if (a.Kind != null && b.Kind != null && a.Kind != b.Kind)
+            {
+                return false;
+            }
+
+            if (a.Uri != b.Uri) return false;
+
+            return true;
+
+        }
+
+        public static List<RtcpFeedback> ReduceRtcpFeedback(RtpCodecCapability codecA, RtpCodecCapability codecB)
+        {
+            List<RtcpFeedback> reducedRtcpFeedback = new List<RtcpFeedback>();
+
+            foreach (RtcpFeedback aFb in codecA.RtcpFeedback)
+            {
+                foreach (RtcpFeedback bFb in codecB.RtcpFeedback)
+                {
+                    if (aFb.Type == bFb.Type)
+                    {
+                        if (aFb.Parameter == bFb.Parameter || (aFb.Parameter == null && bFb.Parameter == null))
+                        {
+                            reducedRtcpFeedback.Add(aFb);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return reducedRtcpFeedback;
         }
 
         public static bool CanReceive(RtpParameters rtpParam,ExtendedRtpCapabilities extendedRtpCapabilities) 
