@@ -1067,10 +1067,10 @@ namespace Utilme.SdpTransform
             var subTokens = tokens[1].Split('/');
             return new Rtpmap
             {
-                PayloadType = int.Parse(tokens[0]),
+                PayloadType = byte.Parse(tokens[0]),
                 EncodingName = subTokens[0],
-                ClockRate = int.Parse(subTokens[1]),
-                Channels = subTokens.Length > 2 ? int.Parse(subTokens[2]) : null
+                ClockRate = byte.Parse(subTokens[1]),
+                Channels = subTokens.Length > 2 ? byte.Parse(subTokens[2]) : null
             };
         }
 
@@ -1088,7 +1088,7 @@ namespace Utilme.SdpTransform
                  .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             return new Fmtp
             {
-                PayloadType = int.Parse(tokens[0]),
+                PayloadType = byte.Parse(tokens[0]),
                 Value = tokens[1],
             };
         }
@@ -1105,7 +1105,7 @@ namespace Utilme.SdpTransform
         //  Value = "level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f"
         // }
         // a=fmtp:108 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
-        public static Fmtp ToFmtp(this Dictionary<string, object> dictionary, int payloadType)
+        public static Fmtp ToFmtp(this Dictionary<string, object> dictionary, byte payloadType)
         {
             Fmtp fmtp = new()
             {
@@ -1169,7 +1169,7 @@ namespace Utilme.SdpTransform
                 .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             return new RtcpFb
             {
-                PayloadType = int.Parse(tokens[0]),
+                PayloadType = byte.Parse(tokens[0]),
                 Type = tokens[1],
                 SubType = tokens.Length > 2 ? tokens[2] : null
             };
@@ -1189,7 +1189,7 @@ namespace Utilme.SdpTransform
             var subtokens = tokens[0].Split('/');
             return new Extmap
             {
-                Value = int.Parse(subtokens[0]),
+                Value = byte.Parse(subtokens[0]),
                 Direction = subtokens.Length > 1 ? subtokens[1].EnumFromStringValue<Direction>() : null,
                 Uri = new Uri(tokens[1]),
                 ExtensionAttributes = tokens.Length > 2 ? tokens[2] : null

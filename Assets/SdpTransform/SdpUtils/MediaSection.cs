@@ -126,11 +126,11 @@ public class MediaSection
         const string MimeTypePattern = @"^(audio|video)/(.+)";
         Regex MimeTypeRegex = new Regex(MimeTypePattern, RegexOptions.IgnoreCase);
 
-        Match mimeTypeMatch = MimeTypeRegex.Match(codec.mimeType);
+        Match mimeTypeMatch = MimeTypeRegex.Match(codec.MimeType);
 
         if (!mimeTypeMatch.Success)
         {
-            throw new InvalidOperationException("Invalid codec.mimeType");
+            throw new InvalidOperationException("Invalid codec.MimeType");
         }
 
         return mimeTypeMatch.Groups[2].Value;
@@ -200,27 +200,27 @@ public class AnswerMediaSection  : MediaSection
 
                     if (_answerRtp!=null) 
                     {
-                        foreach (var codec in _answerRtp.codecs)
+                        foreach (var codec in _answerRtp.Codecs)
                         {
                             Rtpmap rtp = new Rtpmap 
                             {
-                                PayloadType = codec.payloadType,
+                                PayloadType = codec.PayloadType,
                                 EncodingName = GetCodecName(codec),
-                                ClockRate = codec.clockRate
+                                ClockRate = codec.ClockRate
                             };
 
-                            if (codec.channels>1) 
+                            if (codec.Channels>1) 
                             {
-                                rtp.Channels = codec.channels;
+                                rtp.Channels = codec.Channels;
                             }
 
                             _mediaObject.Attributes.Rtpmaps.Add(rtp);
 
 
                             Dictionary<string, object> codecParameters;
-                            if (codec.parameters != null)
+                            if (codec.Parameters != null)
                             {
-                                codecParameters = new Dictionary<string, object>(codec.parameters);
+                                codecParameters = new Dictionary<string, object>(codec.Parameters);
                             }
                             else 
                             {
@@ -228,9 +228,9 @@ public class AnswerMediaSection  : MediaSection
                             }
 
                             List<RtcpFeedback> codecRtcpFeedback;
-                            if (codec.rtcpFeedback!=null)
+                            if (codec.RtcpFeedback!=null)
                             {
-                                codecRtcpFeedback = codec.rtcpFeedback;
+                                codecRtcpFeedback = codec.RtcpFeedback;
                             }
                             else 
                             {
@@ -239,9 +239,9 @@ public class AnswerMediaSection  : MediaSection
 
                             if (_codecOptions != null) 
                             {
-                                RtpCodecParameters offerCodec = _offerRtp!.codecs.Find(x => x.payloadType == codec.payloadType);
+                                RtpCodecParameters offerCodec = _offerRtp!.Codecs.Find(x => x.PayloadType == codec.PayloadType);
 
-                                switch (codec.mimeType.ToLower()) 
+                                switch (codec.MimeType.ToLower()) 
                                 {
                                     case "audio/opus":
                                     case "audio/multiopus":
@@ -249,13 +249,13 @@ public class AnswerMediaSection  : MediaSection
                                         //
                                         if (_codecOptions.opusStereo!=null) 
                                         {
-                                            if (!offerCodec.parameters.ContainsKey("sprop-stereo"))
+                                            if (!offerCodec.Parameters.ContainsKey("sprop-stereo"))
                                             {
-                                                offerCodec.parameters.Add("sprop-stereo", _codecOptions.opusStereo.Value ? 1 : 0);
+                                                offerCodec.Parameters.Add("sprop-stereo", _codecOptions.opusStereo.Value ? 1 : 0);
                                             }
                                             else
                                             {
-                                                offerCodec.parameters["sprop-stereo"] = _codecOptions.opusStereo.Value ? 1 : 0;
+                                                offerCodec.Parameters["sprop-stereo"] = _codecOptions.opusStereo.Value ? 1 : 0;
                                             }
 
                                             if (!codecParameters.ContainsKey("stereo"))
@@ -273,13 +273,13 @@ public class AnswerMediaSection  : MediaSection
 
                                         if (_codecOptions.opusFec != null) 
                                         {
-                                            if (!offerCodec.parameters.ContainsKey("useinbandfec"))
+                                            if (!offerCodec.Parameters.ContainsKey("useinbandfec"))
                                             {
-                                                offerCodec.parameters.Add("useinbandfec", _codecOptions.opusFec.Value ? 1 : 0);
+                                                offerCodec.Parameters.Add("useinbandfec", _codecOptions.opusFec.Value ? 1 : 0);
                                             }
                                             else
                                             {
-                                                offerCodec.parameters["useinbandfec"] = _codecOptions.opusFec.Value ? 1 : 0;
+                                                offerCodec.Parameters["useinbandfec"] = _codecOptions.opusFec.Value ? 1 : 0;
                                             }
 
                                             if (!codecParameters.ContainsKey("useinbandfec"))
@@ -296,13 +296,13 @@ public class AnswerMediaSection  : MediaSection
                                         ////////
                                         if (_codecOptions.opusDtx != null) 
                                         {
-                                            if (!offerCodec.parameters.ContainsKey("usedtx"))
+                                            if (!offerCodec.Parameters.ContainsKey("usedtx"))
                                             {
-                                                offerCodec.parameters.Add("usedtx", _codecOptions.opusDtx.Value ? 1 : 0);
+                                                offerCodec.Parameters.Add("usedtx", _codecOptions.opusDtx.Value ? 1 : 0);
                                             }
                                             else
                                             {
-                                                offerCodec.parameters["usedtx"] = _codecOptions.opusDtx.Value ? 1 : 0;
+                                                offerCodec.Parameters["usedtx"] = _codecOptions.opusDtx.Value ? 1 : 0;
                                             }
 
                                             if (!codecParameters.ContainsKey("usedtx"))
@@ -343,13 +343,13 @@ public class AnswerMediaSection  : MediaSection
                                         //
                                         if (_codecOptions.opusPtime != null)
                                         {
-                                            if (!offerCodec.parameters.ContainsKey("ptime"))
+                                            if (!offerCodec.Parameters.ContainsKey("ptime"))
                                             {
-                                                offerCodec.parameters.Add("ptime", _codecOptions.opusPtime.Value);
+                                                offerCodec.Parameters.Add("ptime", _codecOptions.opusPtime.Value);
                                             }
                                             else
                                             {
-                                                offerCodec.parameters["ptime"] = _codecOptions.opusPtime.Value;
+                                                offerCodec.Parameters["ptime"] = _codecOptions.opusPtime.Value;
                                             }
 
                                             if (!codecParameters.ContainsKey("ptime"))
@@ -368,15 +368,15 @@ public class AnswerMediaSection  : MediaSection
 
                                         if (_codecOptions.opusNack!=null) 
                                         {
-                                            if (offerCodec != null && offerCodec.rtcpFeedback != null)
+                                            if (offerCodec != null && offerCodec.RtcpFeedback != null)
                                             {
-                                                offerCodec.rtcpFeedback = offerCodec.rtcpFeedback
-                                                    .Where(fb => fb.type != "nack" || fb.parameters != null)
+                                                offerCodec.RtcpFeedback = offerCodec.RtcpFeedback
+                                                    .Where(fb => fb.Type != "nack" || fb.Parameter != null)
                                                     .ToList();
                                             }
 
                                             codecRtcpFeedback = codecRtcpFeedback.
-                                                Where(fb => fb.type != "nack" || fb.parameters != null).
+                                                Where(fb => fb.Type != "nack" || fb.Parameter != null).
                                                 ToList();
                                         }
 
@@ -426,7 +426,7 @@ public class AnswerMediaSection  : MediaSection
                                         break;
                                 }
 
-                                Fmtp fmtp = new Fmtp {PayloadType=codec.payloadType,Value ="" };
+                                Fmtp fmtp = new Fmtp {PayloadType=codec.PayloadType,Value ="" };
 
                                 foreach (var key in codecParameters.Keys)
                                 {
@@ -446,7 +446,7 @@ public class AnswerMediaSection  : MediaSection
                                 foreach (var fb in codecRtcpFeedback)
                                 {
                                     _mediaObject.Attributes.RtcpFbs.Add(
-                                        new RtcpFb {PayloadType = codec.payloadType,Type = fb.type,SubType = fb.parameters});
+                                        new RtcpFb {PayloadType = codec.PayloadType,Type = fb.Type,SubType = fb.Parameter});
 
                                 }
 
@@ -455,17 +455,17 @@ public class AnswerMediaSection  : MediaSection
                         }
 
                         //_mediaObject.payloads = answerRtpParameters!.codecs
-                        //.map((codec: RtpCodecParameters) => codec.payloadType)
+                        //.map((codec: RtpCodecParameters) => codec.PayloadType)
                         //.join(' ');
 
                         _mediaObject.Attributes.Extmaps = new List<Extmap>();
 
-                        if (_answerRtp!=null && _answerRtp.headerExtensions!=null) 
+                        if (_answerRtp!=null && _answerRtp.HeaderExtensions!=null) 
                         {
-                            foreach (var ext in _answerRtp.headerExtensions)
+                            foreach (var ext in _answerRtp.HeaderExtensions)
                             {
                                 // Don't add a header extension if not present in the offer.
-                                bool found = (tempMediaDes.Attributes.Extmaps.Any(localExt => localExt.Uri.AbsoluteUri == ext.uri));
+                                bool found = (tempMediaDes.Attributes.Extmaps.Any(localExt => localExt.Uri.AbsoluteUri == EnumExtensions.GetEnumMemberValue(ext.Uri)));
 
                                 if (!found)
                                 {
@@ -474,8 +474,8 @@ public class AnswerMediaSection  : MediaSection
 
                                 _mediaObject.Attributes.Extmaps.Add(new Extmap
                                 {
-                                    Uri = new Uri(ext.uri) ,
-                                    Value = ext.id
+                                    Uri = new Uri(EnumExtensions.GetEnumMemberValue(ext.Uri)) ,
+                                    Value = ext.Id
                                 });
                             }
                         }
@@ -617,15 +617,15 @@ public class OfferMediaSection : MediaSection
 
         switch (_mediaKind) 
         {
-            case MediaKind.audio:
+            case MediaKind.AUDIO:
                 _mediaObject.Media = MediaType.Audio;
                 break;
 
-            case MediaKind.video:
+            case MediaKind.VIDEO:
                 _mediaObject.Media = MediaType.Video;
                 break;
 
-            case MediaKind.application:
+            case MediaKind.APPLICATION:
                 _mediaObject.Media = MediaType.Application;
                 break;
         }
@@ -662,8 +662,8 @@ public class OfferMediaSection : MediaSection
 
         switch (_mediaKind) 
         {
-            case MediaKind.audio:
-            case MediaKind.video:
+            case MediaKind.AUDIO:
+            case MediaKind.VIDEO:
                 _mediaObject.Direction = "sendonly";
                 _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
                 _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
@@ -682,39 +682,39 @@ public class OfferMediaSection : MediaSection
 
                 if (_offerRtp!=null) 
                 {
-                    foreach (var codec in _offerRtp.codecs)
+                    foreach (var codec in _offerRtp.Codecs)
                     {
                         Rtpmap rtp = new Rtpmap
                         {
-                            PayloadType = codec.payloadType,
+                            PayloadType = codec.PayloadType,
                             EncodingName = GetCodecName(codec),
-                            ClockRate = codec.clockRate
+                            ClockRate = codec.ClockRate
                         };
 
-                        if (codec.channels > 1)
+                        if (codec.Channels > 1)
                         {
-                            rtp.Channels = codec.channels;
+                            rtp.Channels = codec.Channels;
                         }
 
                         _mediaObject.Attributes.Rtpmaps.Add(rtp);
 
                         Fmtp fmtp = new Fmtp 
                         {
-                            PayloadType = codec.payloadType,
+                            PayloadType = codec.PayloadType,
                             Value = "",
                         };
 
                         StringBuilder configBuilder = new System.Text.StringBuilder();
 
 
-                        foreach (var keyV in codec.parameters)
+                        foreach (var keyV in codec.Parameters)
                         {
                             if (configBuilder.Length > 0)
                             {
                                 configBuilder.Append(';');
                             }
 
-                            configBuilder.Append($"{keyV.Key}={codec.parameters[keyV.Key]}");
+                            configBuilder.Append($"{keyV.Key}={codec.Parameters[keyV.Key]}");
                         }
 
                         fmtp.Value = configBuilder.ToString();
@@ -724,13 +724,13 @@ public class OfferMediaSection : MediaSection
                             _mediaObject.Attributes.Fmtps.Add(fmtp);
                         }
 
-                        foreach (var fb in codec.rtcpFeedback)
+                        foreach (var fb in codec.RtcpFeedback)
                         {
                             _mediaObject.Attributes.RtcpFbs.Add(new RtcpFb 
                             {
-                                PayloadType = codec.payloadType,
-                                Type = fb.type,
-                                SubType = fb.parameters
+                                PayloadType = codec.PayloadType,
+                                Type = fb.Type,
+                                SubType = fb.Parameter
                             });
                         }
 
@@ -740,19 +740,19 @@ public class OfferMediaSection : MediaSection
                 }
 
                 //this._mediaObject.payloads = offerRtpParameters!.codecs
-                //  .map((codec: RtpCodecParameters) => codec.payloadType)
+                //  .map((codec: RtpCodecParameters) => codec.PayloadType)
                 //.join(' ');
 
                 _mediaObject.Attributes.Extmaps = new List<Extmap>();
 
-                if (_offerRtp!=null && _offerRtp.headerExtensions != null) 
+                if (_offerRtp!=null && _offerRtp.HeaderExtensions != null) 
                 {
-                    foreach (var ext in _offerRtp.headerExtensions)
+                    foreach (var ext in _offerRtp.HeaderExtensions)
                     {
                         _mediaObject.Attributes.Extmaps.Add(new Extmap 
                         {
-                            Uri = new Uri(ext.uri),
-                            Value = ext.id
+                            Uri = new Uri(EnumExtensions.GetEnumMemberValue(ext.Uri)),
+                            Value = ext.Id
                         });
                     }
                 }
@@ -762,26 +762,26 @@ public class OfferMediaSection : MediaSection
                 //_mediaObject.rtcpMux = 'rtcp-mux';
                 //_mediaObject.rtcpRsize = 'rtcp-rsize';
 
-                if (_offerRtp != null && _offerRtp.encodings != null && _offerRtp.encodings.Count > 0) 
+                if (_offerRtp != null && _offerRtp.Encodings != null && _offerRtp.Encodings.Count > 0)
                 {
-                    RtpEncodingParameters encoding = _offerRtp.encodings[0];
-                    int ssrc = encoding.ssrc;
-                    RtpEncodingParameters.RtxParameters rtsxSSrc =null;
-                    if (encoding.rtx!=null) 
+                    RtpEncodingParameters encoding = _offerRtp.Encodings[0];
+                    uint ssrc = encoding.Ssrc.Value;
+                    Rtx rtsxSSrc = null;
+                    if (encoding.Rtx != null) 
                     {
-                        rtsxSSrc = encoding.rtx;
+                        rtsxSSrc = encoding.Rtx;
                     }
 
                     _mediaObject.Attributes.Ssrcs = new List<Ssrc>();
                     _mediaObject.Attributes.SsrcGroups = new List<SsrcGroup>();
 
-                    if (_offerRtp.RtcpParameters!=null && !string.IsNullOrEmpty(_offerRtp.RtcpParameters.cname)) 
+                    if (_offerRtp.Rtcp !=null && !string.IsNullOrEmpty(_offerRtp.Rtcp.CNAME)) 
                     {
                         _mediaObject.Attributes.Ssrcs.Add(new Ssrc 
                         {
                             Id = (uint)ssrc,
                             Attribute = "cname",
-                            Value = _offerRtp.RtcpParameters.cname
+                            Value = _offerRtp.Rtcp.CNAME
                         });
 
                     }
@@ -799,13 +799,13 @@ public class OfferMediaSection : MediaSection
 
                     if (rtsxSSrc!=null) 
                     {
-                        if (_offerRtp.RtcpParameters != null && !string.IsNullOrEmpty(_offerRtp.RtcpParameters.cname))
+                        if (_offerRtp.Rtcp != null && !string.IsNullOrEmpty(_offerRtp.Rtcp.CNAME))
                         {
                             _mediaObject.Attributes.Ssrcs.Add(new Ssrc
                             {
                                 Id = (uint)ssrc,
                                 Attribute = "cname",
-                                Value = _offerRtp.RtcpParameters.cname
+                                Value = _offerRtp.Rtcp.CNAME
                             });
 
                         }
@@ -824,7 +824,7 @@ public class OfferMediaSection : MediaSection
                         _mediaObject.Attributes.SsrcGroups.Add(new SsrcGroup 
                         {
                             Semantics = "FID",
-                            SsrcIds = new string[] {ssrc.ToString(),rtsxSSrc.ssrc.ToString() },
+                            SsrcIds = new string[] {ssrc.ToString(),rtsxSSrc.Ssrc.ToString() },
                         });
 
                     }
@@ -833,7 +833,7 @@ public class OfferMediaSection : MediaSection
                 
                 break;
 
-            case MediaKind.application:
+            case MediaKind.APPLICATION:
 
                 if (!_oldDataChannelSpec) 
                 {

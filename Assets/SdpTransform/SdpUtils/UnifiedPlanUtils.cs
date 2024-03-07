@@ -7,18 +7,17 @@ using Utilme.SdpTransform;
 using System;
 using System.Linq;
 
-public static class UnifiedPlanUtils
+public class UnifiedPlanUtils
 {
     public static List<RtpEncodingParameters> GetRtpEncodingParameters(MediaDescription offerMediaObject)
     {
-        List<int> ssrcs = new List<int>();
+        List<uint> ssrcs = new List<uint>();
 
         if (offerMediaObject.Attributes.Ssrcs!=null && offerMediaObject.Attributes.Ssrcs.Count > 0) 
         {
             foreach (var line in offerMediaObject.Attributes.Ssrcs) 
             {
-                int tempSsrcId = (int)line.Id;
-                ssrcs.Add(tempSsrcId);
+                ssrcs.Add(line.Id);
             }
         }
 
@@ -27,7 +26,7 @@ public static class UnifiedPlanUtils
             throw new Exception("no a=ssrc lines found");
         }
 
-        Dictionary<int, int> ssrcToRtxSsrc = new Dictionary<int, int>();
+        Dictionary<uint, uint> ssrcToRtxSsrc = new Dictionary<uint, uint>();
 
         foreach (var line in offerMediaObject.Attributes.SsrcGroups ?? Enumerable.Empty<SsrcGroup>())
         {
@@ -36,7 +35,7 @@ public static class UnifiedPlanUtils
                 continue;
             }
 
-            var ssrcRtxSsrc = line.SsrcIds.Select(int.Parse).ToList();
+            var ssrcRtxSsrc = line.SsrcIds.Select(uint.Parse).ToList();
 
             if (ssrcRtxSsrc.Count == 2 && ssrcs.Contains(ssrcRtxSsrc[0]))
             {
@@ -52,7 +51,7 @@ public static class UnifiedPlanUtils
 
         foreach (var ssrc in ssrcs)
         {
-            ssrcToRtxSsrc.Add(ssrc,-1);
+            ssrcToRtxSsrc.Add(ssrc, uint.MaxValue);
         }
 
         List<RtpEncodingParameters> encodings = new List<RtpEncodingParameters>();
@@ -62,11 +61,11 @@ public static class UnifiedPlanUtils
             var ssrc = kvp.Key;
             var rtxSsrc = kvp.Value;
 
-            RtpEncodingParameters encoding = new RtpEncodingParameters { ssrc = ssrc };
+            RtpEncodingParameters encoding = new RtpEncodingParameters { Ssrc = ssrc };
 
-            if (rtxSsrc!=-1)
+            if (rtxSsrc != uint.MaxValue)
             {
-                encoding.rtx.ssrc = rtxSsrc;
+                encoding.Rtx.Ssrc = rtxSsrc;
             }
 
             encodings.Add(encoding);
@@ -77,7 +76,7 @@ public static class UnifiedPlanUtils
 
     }
 
-    public static void AddLegacySimulcast(MediaDescription offerMediaObject, int numStreams)
+    public void AddLegacySimulcast(MediaDescription offerMediaObject, int numStreams)
     {
         if (numStreams <= 1)
         {

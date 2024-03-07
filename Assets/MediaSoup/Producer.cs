@@ -11,11 +11,11 @@ namespace Mediasoup
 {
     public interface IProducer
     {
-        string id { get;}
-        string localId { get;}
+        string id { get; }
+        string localId { get; }
         bool isClosed { get; }
 
-        RTCRtpSender rtpSender {get;}
+        RTCRtpSender rtpSender { get; }
         MediaStreamTrack track { get; }
         MediaKind kind { get; }
         RtpParameters rtpParameters { get; }
@@ -28,7 +28,7 @@ namespace Mediasoup
 
         object appData { get; }
 
-        EnhancedEventEmitter<ProducerObserverEvents> observer { get;}
+        EnhancedEventEmitter<ProducerObserverEvents> observer { get; }
 
         void Close();
         void TransportClosed();
@@ -38,7 +38,7 @@ namespace Mediasoup
         void ReplaceTrack(MediaStreamTrack track);
         void SetMaxSpatialLayer(int layer);
         void SetRtpEncodingParameters(RtpEncodingParameters parameters);
-        
+
 
     }
 
@@ -92,7 +92,7 @@ namespace Mediasoup
             observer = new EnhancedEventEmitter<ProducerObserverEvents>();
         }
 
-        private void OnTrackEnded() 
+        private void OnTrackEnded()
         {
             _ = Emit("trackended");
             _ = observer.SafeEmit("trackended");
@@ -100,7 +100,7 @@ namespace Mediasoup
 
         private void HandleTrack()
         {
-            
+
         }
 
         private void DestroyTrack()
@@ -169,12 +169,12 @@ namespace Mediasoup
 
             isPaused = false;
 
-            if (track!=null && disableTrackOnPause ) 
+            if (track != null && disableTrackOnPause)
             {
                 track.Enabled = true;
             }
 
-            if (zeroRtpOnPause) 
+            if (zeroRtpOnPause)
             {
                 _ = SafeEmit("resume");
             }
@@ -192,16 +192,18 @@ namespace Mediasoup
                     try
                     {
                         _track.Stop();
-                    } catch (Exception error) { }
+                    }
+                    catch (Exception error) { }
                 }
 
                 throw new InvalidOperationException("Closed");
-            } else if (_track != null && track.ReadyState == TrackState.Ended) 
+            }
+            else if (_track != null && track.ReadyState == TrackState.Ended)
             {
                 throw new InvalidOperationException("Ended");
             }
 
-            if (track == _track) 
+            if (track == _track)
             {
                 return;
             }
@@ -212,7 +214,7 @@ namespace Mediasoup
 
             track = _track;
 
-            if (track!=null && disableTrackOnPause)
+            if (track != null && disableTrackOnPause)
             {
                 if (!isPaused)
                 {
@@ -231,12 +233,12 @@ namespace Mediasoup
             {
                 throw new InvalidOperationException("Closed");
             }
-            else if (kind != MediaKind.video)
+            else if (kind != MediaKind.VIDEO)
             {
                 throw new InvalidProgramException("not a video producer");
             }
 
-            if (layer == maxSpatialLayer) 
+            if (layer == maxSpatialLayer)
             {
                 return;
             }
@@ -251,7 +253,8 @@ namespace Mediasoup
             if (isClosed)
             {
                 throw new InvalidOperationException("Closed");
-            } else if (parameters==null) 
+            }
+            else if (parameters == null)
             {
                 throw new InvalidCastException("Invalid params");
             }
@@ -259,14 +262,14 @@ namespace Mediasoup
             RTCRtpEncodingParameters tempParam = new RTCRtpEncodingParameters
             {
                 active = true,
-                maxBitrate = (ulong)parameters.maxBitrate,
-                maxFramerate = (uint)parameters.maxFramerate,
-                rid = parameters.rid,
-                scaleResolutionDownBy = parameters.scaleResolutionDownBy
+                maxBitrate = (ulong)parameters.MaxBitrate,
+                maxFramerate = (uint)parameters.MaxFramerate,
+                rid = parameters.Rid,
+                scaleResolutionDownBy = parameters.ScaleResolutionDownBy
             };
 
             RTCRtpSendParameters sendParam = rtpSender.GetParameters();
-            for (int i=0;i<sendParam.encodings.Length;i++) 
+            for (int i = 0; i < sendParam.encodings.Length; i++)
             {
                 sendParam.encodings[i] = tempParam;
             }
@@ -283,8 +286,8 @@ namespace Mediasoup
 
         public Tuple<Action, Action<string>> OnPause;
         public Tuple<Action, Action<string>> OnResume;
-        public Tuple<Action<MediaStreamTrack>,Action, Action<string>> OnReplaceTrack;
-        public Tuple<Action<int>,Action, Action<string>> OnSetmaxspatiallayer;
+        public Tuple<Action<MediaStreamTrack>, Action, Action<string>> OnReplaceTrack;
+        public Tuple<Action<int>, Action, Action<string>> OnSetmaxspatiallayer;
         public Tuple<Action<RtpEncodingParameters>, Action, Action<string>> OnSetrtpencodingparameters;
         public Tuple<Action<RTCStatsReport>, Action<string>> Getstats;
         public Action OnClose;
@@ -313,7 +316,7 @@ namespace Mediasoup
         public Action OnTrackEnded { get; set; }
     }
 
-    public class ProducerCodecOptions 
+    public class ProducerCodecOptions
     {
         public bool? opusStereo;
         public bool? opusFec;
