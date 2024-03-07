@@ -4,7 +4,7 @@ using UnityEngine;
 using Unity.WebRTC;
 using Mediasoup.SctpParameter;
 using Mediasoup.Internal;
-
+using Mediasoup.Types;
 
 namespace Mediasoup.DataConsumers 
 {
@@ -135,14 +135,14 @@ namespace Mediasoup.DataConsumers
     }
 
 
-    public class DataConsumerOptions<TDataConsumerAppData> 
+    public class DataConsumerOptions 
     {
         public string id;
         public string datProducerId;
-        public SctpParameters sctpStreamParameters;
+        public SctpStreamParameters sctpStreamParameters;
         public string label;
         public string protocol;
-        public TDataConsumerAppData dataConsumerAppData;
+        public AppData dataConsumerAppData;
     }
 
     public class DataConsumerEvents 

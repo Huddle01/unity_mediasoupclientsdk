@@ -355,7 +355,7 @@ namespace Mediasoup.Ortc
             }
         }
 
-        public static void ValidateSctpParameters(SctpParameters param)
+        public static void ValidateSctpParameters(SctpStreamParameters param)
         {
             if (param == null)
             {
@@ -469,7 +469,7 @@ namespace Mediasoup.Ortc
             return null;
         }
 
-        public static string GenerateProbatorRtpParameters()
+        public static RtpParameters GenerateProbatorRtpParameters()
         {
             return null;
         }
