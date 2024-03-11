@@ -25,5 +25,10 @@ namespace Mediasoup.RtpParameter {
         /// as specified in RFC 3550 (if false). Default true.
         /// </summary>
         public bool? ReducedSize { get; set; } = true;
+
+        // <summary>
+        // Whether RTCP-mux is used. Default true.
+        // </summary>
+        public bool? mux { get; set; } = true;
     }
 }
