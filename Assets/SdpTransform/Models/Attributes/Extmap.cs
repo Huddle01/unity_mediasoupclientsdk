@@ -9,7 +9,7 @@ namespace Utilme.SdpTransform
     {
         public const string Label = "extmap:";
 
-        public int Value { get; set; }
+        public byte Value { get; set; }
         public Direction? Direction { get; set; }
         public Uri Uri { get; set; }
 

@@ -271,7 +271,7 @@ public class RemoteSdp
         ReplaceMediaSection(mediaSection);
     }
 
-    public void SendSctpAssociation(MediaDescription _offerMediaObject) 
+    public void SendSctpAssociation(object _offerMediaObject) 
     {
         AnswerMediaSection mediaSection = new AnswerMediaSection(iceParameters, iceCandidates, dtlsParameters, sctpParameters, plainRtpParameters,
                                                     false, _offerMediaObject);
@@ -282,7 +282,7 @@ public class RemoteSdp
     public void ReceiveSctpAssociation(bool _oldDataChannelSpec) 
     {
         OfferMediaSection mediaSection = new OfferMediaSection(iceParameters, iceCandidates, dtlsParameters, sctpParameters, plainRtpParameters,
-                                                        false, "datachannel",MediaKind.application,null,null,null, _oldDataChannelSpec);
+                                                        false, "datachannel",MediaKind.APPLICATION,null,null,null, _oldDataChannelSpec);
 
         AddMediaSection(mediaSection);
     }
