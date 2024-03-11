@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using Mediasoup.Transports;
 using Mediasoup.Types;
+using System.Threading.Tasks;
 
 namespace Mediasoup 
 {
@@ -45,7 +46,7 @@ namespace Mediasoup
             return sctpCapabilities;
         }
 
-        public async void Load(RtpCapabilities routerRtpCapabilities,RTCConfiguration peerConnectionOptions) 
+        public async Task Load(RtpCapabilities routerRtpCapabilities) 
         {
             if (isLoaded) { 
                 throw new System.Exception("already loaded");
@@ -131,8 +132,8 @@ namespace Mediasoup
         }
 
         public enum Direction { 
-            Send,
-            Recv
+            send,
+            recv
         }
 
         public Transport<AppData> CreateTransport(Direction direction, string id, IceParameters iceParameters, List<IceCandidate> iceCandidates,
