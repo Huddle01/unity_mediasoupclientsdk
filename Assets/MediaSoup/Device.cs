@@ -127,7 +127,7 @@ namespace Mediasoup
             object additionalSettings, object proprietaryConstraints, AppData appData) {
 
             return new Transport<AppData>("recv", id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
-                iceTransportPolicy, additionalSettings, proprietaryConstraints, appData, handler, extendedRtpCapabilities, canProduceByKind);`
+                iceTransportPolicy, additionalSettings, proprietaryConstraints, appData, handler, extendedRtpCapabilities, canProduceByKind);
         }
 
         public enum Direction { 

@@ -301,15 +301,11 @@ namespace Mediasoup.Transports
                 {
                      normalizedEncodings = options.encodings.Select(encoding =>
                     {
-                        RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters {Active = true };
+                        RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters {Active = encoding.Active };
 
-                        if (!encoding.Active) 
-                        {
-                            normalizedEncoding.Active = false;
-                        }
 
                         normalizedEncoding.Dtx = encoding.Dtx;
-                        normalizedEncoding.ScalabilityMode = encoding.ScaleResolutionDownBy.Value.ToString();
+                        normalizedEncoding.ScalabilityMode = encoding.ScalabilityMode;
                         normalizedEncoding.ScaleResolutionDownBy = encoding.ScaleResolutionDownBy.Value;
                         normalizedEncoding.MaxBitrate = encoding.MaxBitrate.Value;
                         normalizedEncoding.MaxFramerate = encoding.MaxFramerate.Value;
