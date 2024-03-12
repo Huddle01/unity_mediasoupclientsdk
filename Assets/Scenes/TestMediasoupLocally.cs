@@ -6,13 +6,26 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Net.WebSockets;
+using System;
+using System.Threading;
+using System.Text;
+using Mediasoup.RtpParameter;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Mediasoup.SctpParameter;
+using Unity.WebRTC;
 
 public class TestMediasoupLocally : MonoBehaviour
 {
     public Device DeviceObj;
+    public RtpCapabilities RtpCapabilitiesObj;
 
     public Transport<AppData> SendTransport;
     public Transport<AppData> ReceiveTransport;
+
+    public Producer<AppData> ProducerObj;
+    public Consumer<AppData> ConsumerObj;
 
     private WebCamTexture _webCamTexture;
     private Texture _webCamStreamingTexture;
@@ -20,10 +33,49 @@ public class TestMediasoupLocally : MonoBehaviour
     [SerializeField]
     private RawImage _localVideoRawImage;
 
+    private ClientWebSocket _websocket;
+
+    private CancellationToken _tokenSource;
+
+    private string _socketUrl = "ws://localhost:8080";
+
+    private int _producerId;
+
+    public ProducerOptions<AppData> ProducerOptionsObj;
+
     // Start is called before the first frame update
-    void Start()
+    async void Start()
     {
-        
+        ProducerOptionsObj = new ProducerOptions<AppData> 
+        {
+            encodings = {   new RtpEncodingParameters 
+                            {
+                                Rid = "r0",
+                                MaxBitrate = 100000,
+                                ScalabilityMode = "S1T3"
+                            },
+                            new RtpEncodingParameters
+                            {
+                                Rid = "r1",
+                                MaxBitrate = 300000,
+                                ScalabilityMode = "S1T3"
+                            },new RtpEncodingParameters
+                            {
+                                Rid = "r2",
+                                MaxBitrate = 900000,
+                                ScalabilityMode = "S1T3"
+                            }
+                        },
+
+            codecOptions = { videoGoogleStartBitrate = 1000 }
+        };
+
+        _websocket = new ClientWebSocket();
+
+        Uri serverUrl = new Uri(_socketUrl);
+        _tokenSource = new CancellationToken();
+        await _websocket.ConnectAsync(serverUrl,CancellationToken.None);
+        Debug.Log($"Connection successfully with {_websocket.State.ToString()}");
     }
 
     // Update is called once per frame
@@ -37,25 +89,130 @@ public class TestMediasoupLocally : MonoBehaviour
         StartCoroutine(CaptureWebCamVideo());
     }
 
-    public async Task GetRtpCapabilities() 
+    public async void GetRtpCapabilities() 
     {
-    
+        var encoded = Encoding.UTF8.GetBytes("getRtpCapabilities");
+        var buffer = new ArraySegment<byte>(encoded, 0, encoded.Length);
+
+        Debug.Log($"Sending Message: getRtpCapabilities");
+        await _websocket.SendAsync(encoded,WebSocketMessageType.Text,true,CancellationToken.None);
+
+        string receivedMessage = await ReceiveMessage(_websocket);
+        Debug.Log($"Received: {receivedMessage}");
+
+        RtpCapabilitiesObj = JsonConvert.DeserializeObject<RtpCapabilities>(receivedMessage);
+
     }
 
-    public void CreateDevice() 
+
+    public async void CreateDevice() 
     {
         DeviceObj = new Device();
+        await DeviceObj.Load(RtpCapabilitiesObj);
     }
 
-    public void CreateSendTransport()
+    public async void CreateSendTransport()
     {
         if (DeviceObj == null) return;
-        //SendTransport = DeviceObj.CreateSendTransport();
+        var encoded = Encoding.UTF8.GetBytes("createWebRtcTransport");
+        await _websocket.SendAsync(encoded, WebSocketMessageType.Text, true, CancellationToken.None);
+
+        string receivedMessage = await ReceiveMessage(_websocket);
+
+        if (string.IsNullOrEmpty(receivedMessage)) return;
+
+        var jsonParsed = JObject.Parse(receivedMessage);
+
+
+        string id = (string)jsonParsed["id"];
+        IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>((string)jsonParsed["iceParameters"]);
+        List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>((string)jsonParsed["iceParameters"]);
+        DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>((string)jsonParsed["dtlsParameters"]);
+        SctpParameters sctpParameters = JsonConvert.DeserializeObject<SctpParameters>((string)jsonParsed["sctpParameters"]);
+        List<RTCIceServer> iceServers = JsonConvert.DeserializeObject<List<RTCIceServer>>((string)jsonParsed["iceServers"]);
+        RTCIceTransportPolicy iceTransportPolicy = JsonConvert.DeserializeObject<RTCIceTransportPolicy>((string)jsonParsed["iceTransportPolicy"]);
+        object additionalSettings = JsonConvert.DeserializeObject<object>((string)jsonParsed["additionalSettings"]);
+        object proprietaryConstraints = JsonConvert.DeserializeObject<object>((string)jsonParsed["proprietaryConstraints"]);
+        AppData appData = new AppData();
+        SendTransport = DeviceObj.CreateSendTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
+                                                iceTransportPolicy, additionalSettings, proprietaryConstraints,appData);
+
+        SendTransport.On("connect", async (args) =>
+        {
+            var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
+            DtlsParameters dtlsParams = parameters.Item1;
+
+            var responseData = new Dictionary<string, object>
+            {
+                { "transportId", SendTransport.id },
+                { "dtlsParameters", dtlsParams}
+            };
+
+            //convert disctionary to json
+            string responsePayload = JsonConvert.SerializeObject(responseData);
+
+            var data = new { type = "transport-connect", data = responsePayload };
+
+            var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+
+            await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
+
+            parameters.Item2?.Invoke();
+
+        });
+
+        SendTransport.On("produce", async (args) =>
+        {
+            var parameters = (Tuple<TrackKind, RtpParameters, AppData, Action<int>>)args[0];
+            //todo write logic to get producer id
+
+            var responseData = new Dictionary<string, object>
+            {
+                { "transportId", SendTransport.id },
+                { "kind", parameters.Item1.ToString()},
+                { "rtpParameters", parameters.Item2},
+                { "appData", parameters.Item3}
+            };
+
+
+            string responsePayload = JsonConvert.SerializeObject(responseData);
+
+            var data = new { type = "transport-produce", data = responsePayload };
+
+            var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+
+            await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
+
+            string receivedResult = await ReceiveMessage(_websocket);
+
+            _producerId = int.Parse(receivedResult);
+
+            parameters.Item4?.Invoke(_producerId);
+
+        });
+
+
     }
 
-    public void ConnectSendTransportAndProduce()
+    public async void ConnectSendTransportAndProduce()
     {
+        ProducerObj = await SendTransport.ProduceAsync(GetProducerId, ProducerOptionsObj);
 
+        ProducerObj.On("trackended", async (args) =>
+        {
+            Debug.Log("Track ended");
+        });
+
+        ProducerObj.On("transportclose", async (args) =>
+        {
+            Debug.Log("Transport ended");
+        });
+
+    }
+
+    private async Task<int> GetProducerId(TrackKind kind, RtpParameters rtp, AppData _appdata) 
+    {
+        return _producerId;
     }
 
     public void CreateRevcTransport()
@@ -86,6 +243,33 @@ public class TestMediasoupLocally : MonoBehaviour
         _webCamStreamingTexture = _webCamTexture;
 
         _localVideoRawImage.texture = _webCamStreamingTexture;
+    }
+
+    private async Task<string> ReceiveMessage(ClientWebSocket webSocket)
+    {
+        byte[] buffer = new byte[1024];
+        StringBuilder result = new StringBuilder();
+
+        while (webSocket.State == WebSocketState.Open)
+        {
+            WebSocketReceiveResult response = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+
+            if (response.MessageType == WebSocketMessageType.Close)
+            {
+                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+            }
+            else
+            {
+                result.Append(Encoding.UTF8.GetString(buffer, 0, response.Count));
+
+                if (response.EndOfMessage)
+                {
+                    break;
+                }
+            }
+        }
+
+        return result.ToString();
     }
 
 }
