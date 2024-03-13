@@ -901,7 +901,7 @@ namespace Mediasoup.Transports
         public string protocol; //"udp" || "tcp"
         public int port;
         public string type;//'host' | 'srflx' | 'prflx' | 'relay'
-        public string tcpType; //'active' | 'passive' | 'so';
+        public string? tcpType; //'active' | 'passive' | 'so';
     }
 
     [Serializable]

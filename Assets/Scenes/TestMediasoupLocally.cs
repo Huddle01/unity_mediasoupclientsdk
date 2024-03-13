@@ -124,25 +124,25 @@ public class TestMediasoupLocally : MonoBehaviour
     public async void CreateSendTransport()
     {
         if (DeviceObj == null) return;
-        var encoded = Encoding.UTF8.GetBytes("createWebRtcTransport");
+        var data = new { type = "createWebRtcTransport", data = new { sender = true } };
+        var encoded = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
         await _websocket.SendAsync(encoded, WebSocketMessageType.Text, true, CancellationToken.None);
 
         string receivedMessage = await ReceiveMessage(_websocket);
-
+        Debug.Log($"Received: {receivedMessage}");
         if (string.IsNullOrEmpty(receivedMessage)) return;
 
         var jsonParsed = JObject.Parse(receivedMessage);
 
-
         string id = (string)jsonParsed["id"];
-        IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>((string)jsonParsed["iceParameters"]);
-        List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>((string)jsonParsed["iceParameters"]);
-        DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>((string)jsonParsed["dtlsParameters"]);
-        SctpParameters sctpParameters = JsonConvert.DeserializeObject<SctpParameters>((string)jsonParsed["sctpParameters"]);
-        List<RTCIceServer> iceServers = JsonConvert.DeserializeObject<List<RTCIceServer>>((string)jsonParsed["iceServers"]);
-        RTCIceTransportPolicy iceTransportPolicy = JsonConvert.DeserializeObject<RTCIceTransportPolicy>((string)jsonParsed["iceTransportPolicy"]);
-        object additionalSettings = JsonConvert.DeserializeObject<object>((string)jsonParsed["additionalSettings"]);
-        object proprietaryConstraints = JsonConvert.DeserializeObject<object>((string)jsonParsed["proprietaryConstraints"]);
+        IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>(jsonParsed["data"]["iceParameters"].ToString());
+        List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>(jsonParsed["data"]["iceCandidates"].ToString());
+        DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>(jsonParsed["data"]["dtlsParameters"].ToString());
+        SctpParameters sctpParameters = JsonConvert.DeserializeObject<SctpParameters>(jsonParsed["data"]["sctpParameters"].ToString());
+        List<RTCIceServer> iceServers = JsonConvert.DeserializeObject<List<RTCIceServer>>(jsonParsed["data"]["iceServers"].ToString());
+        RTCIceTransportPolicy iceTransportPolicy = JsonConvert.DeserializeObject<RTCIceTransportPolicy>(jsonParsed["data"]["iceTransportPolicy"].ToString());
+        object additionalSettings = JsonConvert.DeserializeObject<object>(jsonParsed["data"]["additionalSettings"].ToString());
+        object proprietaryConstraints = JsonConvert.DeserializeObject<object>(jsonParsed["data"]["proprietaryConstraints"].ToString());
         AppData appData = new AppData();
         SendTransport = DeviceObj.CreateSendTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
                                                 iceTransportPolicy, additionalSettings, proprietaryConstraints,appData);
