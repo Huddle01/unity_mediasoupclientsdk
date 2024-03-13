@@ -48,7 +48,7 @@ namespace Mediasoup.Ortc
             }
 
             // headerExtensions is optional. If unset, fill with an empty array.
-            caps.HeaderExtensions ??= Array.Empty<RtpHeaderExtension>();
+            caps.HeaderExtensions ??= new List<RtpHeaderExtension>();
 
             foreach (var ext in caps.HeaderExtensions)
             {

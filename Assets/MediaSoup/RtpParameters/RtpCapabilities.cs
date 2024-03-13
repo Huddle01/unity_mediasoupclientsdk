@@ -14,12 +14,12 @@ namespace Mediasoup.RtpParameter
         /// <summary>
         /// Supported media and RTX codecs.
         /// </summary>
-        public List<RtpCodecCapability>? Codecs { get; set; }
+        public List<RtpCodecCapability>? Codecs { get; set; } = new List<RtpCodecCapability>();
 
         /// <summary>
         /// Supported RTP header extensions.
         /// </summary>
-        public RtpHeaderExtension[]? HeaderExtensions { get; set; }
+        public  List<RtpHeaderExtension>? HeaderExtensions { get; set; } = new List<RtpHeaderExtension>();
 
         /// <summary>
         /// Supported Rtp capabilitie.
@@ -386,7 +386,7 @@ namespace Mediasoup.RtpParameter
                         }
                     }
                 },
-                HeaderExtensions = new RtpHeaderExtension[]
+                HeaderExtensions = new List<RtpHeaderExtension>
                 {
                      new () {
                         Kind = MediaKind.AUDIO,

@@ -130,7 +130,7 @@ public class CommonUtils
         RtpCapabilities rtpCapabilities = new RtpCapabilities
         {
             Codecs = codecsMap.Values.ToList(),
-            HeaderExtensions = headerExtensions.ToArray()
+            HeaderExtensions = headerExtensions
         };
 
         return rtpCapabilities;

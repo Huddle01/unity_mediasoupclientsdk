@@ -103,8 +103,12 @@ public class TestMediasoupLocally : MonoBehaviour
         string receivedMessage = await ReceiveMessage(_websocket);
         Debug.Log($"Received: {receivedMessage}");
 
-        RtpCapabilitiesObj = JsonConvert.DeserializeObject<RtpCapabilities>(receivedMessage);
+        var jsonParsed = JObject.Parse(receivedMessage);
 
+        var receivedData = jsonParsed["data"];
+
+
+        RtpCapabilitiesObj = JsonConvert.DeserializeObject<RtpCapabilities>((string)receivedData["rtpCapabilities"]);
     }
 
 
