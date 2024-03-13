@@ -33,6 +33,9 @@ public class TestMediasoupLocally : MonoBehaviour
     [SerializeField]
     private RawImage _localVideoRawImage;
 
+    [SerializeField]
+    private RawImage _remoteVideoSource;
+
     private ClientWebSocket _websocket;
 
     private CancellationToken _tokenSource;
@@ -190,8 +193,6 @@ public class TestMediasoupLocally : MonoBehaviour
             parameters.Item4?.Invoke(_producerId);
 
         });
-
-
     }
 
     public async void ConnectSendTransportAndProduce()
@@ -215,15 +216,105 @@ public class TestMediasoupLocally : MonoBehaviour
         return _producerId;
     }
 
-    public void CreateRevcTransport()
+    public async void CreateRevcTransport()
     {
         if (DeviceObj == null) return;
-        //ReceiveTransport = DeviceObj.CreateRecvTransport();
+
+        var encoded = Encoding.UTF8.GetBytes("createWebRtcTransport");
+        await _websocket.SendAsync(encoded, WebSocketMessageType.Text, true, CancellationToken.None);
+
+        string receivedMessage = await ReceiveMessage(_websocket);
+
+        if (string.IsNullOrEmpty(receivedMessage)) return;
+        var jsonParsed = JObject.Parse(receivedMessage);
+
+
+        string id = (string)jsonParsed["id"];
+        IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>((string)jsonParsed["iceParameters"]);
+        List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>((string)jsonParsed["iceParameters"]);
+        DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>((string)jsonParsed["dtlsParameters"]);
+        SctpParameters sctpParameters = JsonConvert.DeserializeObject<SctpParameters>((string)jsonParsed["sctpParameters"]);
+        List<RTCIceServer> iceServers = JsonConvert.DeserializeObject<List<RTCIceServer>>((string)jsonParsed["iceServers"]);
+        RTCIceTransportPolicy iceTransportPolicy = JsonConvert.DeserializeObject<RTCIceTransportPolicy>((string)jsonParsed["iceTransportPolicy"]);
+        object additionalSettings = JsonConvert.DeserializeObject<object>((string)jsonParsed["additionalSettings"]);
+        object proprietaryConstraints = JsonConvert.DeserializeObject<object>((string)jsonParsed["proprietaryConstraints"]);
+        AppData appData = new AppData();
+
+        ReceiveTransport = DeviceObj.CreateRecvTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
+                                                iceTransportPolicy, additionalSettings, proprietaryConstraints, appData);
+
+
+        ReceiveTransport.On("connect", async (args) =>
+        {
+            var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
+            DtlsParameters dtlsParams = parameters.Item1;
+
+            var responseData = new Dictionary<string, object>
+            {
+                { "transportId", ReceiveTransport.id },
+                { "dtlsParameters", dtlsParams}
+            };
+
+            //convert disctionary to json
+            string responsePayload = JsonConvert.SerializeObject(responseData);
+
+            var data = new { type = "transport-recv-connect", data = responsePayload };
+
+            var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+
+            await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
+
+            parameters.Item2?.Invoke();
+
+        });
+
+
+
     }
 
-    public void ConnectRevcTransportAndConsume()
+    public async void ConnectRevcTransportAndConsume()
     {
-        
+        var responseData = new Dictionary<string, object>
+        {
+            { "rtpCapabilities", DeviceObj.GetRtpCapabilities() }
+        };
+
+        string responsePayload = JsonConvert.SerializeObject(responseData);
+
+        var data = new { type = "consume", data = responsePayload };
+
+        var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+        await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
+
+        string receivedMessage = await ReceiveMessage(_websocket);
+
+        if (string.IsNullOrEmpty(receivedMessage)) return;
+
+        var jsonParsed = JObject.Parse(receivedMessage);
+
+
+        string id = (string)jsonParsed["id"];
+        string producerId = (string)jsonParsed["producerId"];
+        string mediaKind = (string)jsonParsed["kind"];
+        RtpParameters rtpParameters = JsonConvert.DeserializeObject<RtpParameters>((string)jsonParsed["rtpParameters"]);
+
+        ConsumerOptions options = new ConsumerOptions
+        {
+            id = id,
+            producerId = producerId,
+            kind = mediaKind,
+            rtpParameters = rtpParameters
+        };
+
+        ConsumerObj = await ReceiveTransport.ConsumeAsync<AppData>();
+
+        VideoStreamTrack track = ConsumerObj.track as VideoStreamTrack;
+
+        track.OnVideoReceived += tex =>
+        {
+            _remoteVideoSource.texture = tex;
+        };
+
     }
 
     private IEnumerator CaptureWebCamVideo()
