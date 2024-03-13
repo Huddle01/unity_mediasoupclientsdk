@@ -9,6 +9,7 @@ using Mediasoup.SctpParameter;
 using Mediasoup.Transports;
 using Unity.WebRTC;
 using Utilme.SdpTransform;
+using UnityEngine;
 
 namespace Mediasoup.Ortc
 {
@@ -70,6 +71,7 @@ namespace Mediasoup.Ortc
             }
 
             var mimeType = codec.MimeType.ToLower();
+
             if (!MimeTypeRegex.IsMatch(mimeType))
             {
                 throw new ArgumentException($"{nameof(codec.MimeType)} is not matched.");
@@ -91,25 +93,32 @@ namespace Mediasoup.Ortc
             // parameters is optional. If unset, set it to an empty object.
             codec.Parameters ??= new Dictionary<string, object>();
 
-            foreach (var item in codec.Parameters)
+            foreach (var (key, val) in codec.Parameters)
             {
-                var key = item.Key;
-                var value = item.Value;
+                var value = val;
+
                 if (value == null)
                 {
-                    codec.Parameters[item.Key] = "";
-                    value = "";
+                    codec.Parameters[key] = string.Empty;
+                    value = string.Empty;
                 }
 
-                if (!value.IsStringType() && !value.IsNumericType())
+                if (value is not (string or uint or int or ulong or long or byte or sbyte))
                 {
-                    throw new ArgumentOutOfRangeException($"invalid codec parameter [key:{key}, value:{value}]");
+                    throw new ArgumentNullException($"invalid codec parameter [key:{key}, value:{value}]");
                 }
 
                 // Specific parameters validation.
-                if (key == "apt" && !value.IsNumericType())
+                if (key == "apt")
                 {
-                    throw new ArgumentOutOfRangeException($"invalid codec apt parameter [key:{key}]");
+                    UnityEngine.Debug.Log($"Key in codec params {key}");
+                    UnityEngine.Debug.Log($"Key in codec params {val}");
+                    UnityEngine.Debug.Log($"Type of value is {value.GetType()}");
+
+                    if (!value.IsNumericType())
+                    {
+                        throw new InvalidCastException("invalid codec apt parameter");
+                    }
                 }
             }
 
@@ -1200,7 +1209,7 @@ namespace Mediasoup.Ortc
                             }
                             catch (Exception ex)
                             {
-                                Debug.WriteLine($"MatchCodecs() | {ex.Message}");
+                                UnityEngine.Debug.Log($"MatchCodecs() | {ex.Message}");
                                 return false;
                             }
 

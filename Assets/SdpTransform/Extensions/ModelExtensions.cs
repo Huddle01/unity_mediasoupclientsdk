@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using UtilmeSdpTransform;
+using UnityEngine;
 
 namespace Utilme.SdpTransform 
 {
@@ -13,8 +14,6 @@ namespace Utilme.SdpTransform
 
         public static Sdp ToSdp(this string str)
         {
-            try
-            {
                 Sdp sdp = new();
 
                 var tokens = str.Split(new string[] { Sdp.CRLF }, StringSplitOptions.RemoveEmptyEntries);
@@ -102,10 +101,14 @@ namespace Utilme.SdpTransform
                 foreach (var token in tokens)
                 {
                     if (token.StartsWith(Sdp.MediaDescriptionIndicator))
-                    {
+                    {   
                         if (md is not null)
                             sdp.MediaDescriptions.Add(md);
+
+                        Debug.Log($"Extract Media description");
                         md = token.ToMediaDescription();
+
+                        Debug.Log($"Extract Media description value {md.Media.ToString()}");
                     }
                     else if (token.StartsWith(Sdp.InformationIndicator))
                         md.Information = token.ToInformation();
@@ -222,12 +225,7 @@ namespace Utilme.SdpTransform
                     sdp.MediaDescriptions.Add(md);
 
                 return sdp;
-            }
-            catch (Exception ex)
-            {
-                var m = ex.Message;
-                return null;
-            }
+            
         }
 
         public static string ToText(this Sdp sdp)
@@ -682,6 +680,7 @@ namespace Utilme.SdpTransform
             var tokens = str
                 .Replace(Sdp.MediaDescriptionIndicator, string.Empty)
                 .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
             return new MediaDescription
             {
                 Media = tokens[0].EnumFromStringValue<MediaType>(),
@@ -1065,11 +1064,12 @@ namespace Utilme.SdpTransform
                  .Replace(Rtpmap.Label, string.Empty)
                  .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var subTokens = tokens[1].Split('/');
+
             return new Rtpmap
             {
                 PayloadType = byte.Parse(tokens[0]),
                 EncodingName = subTokens[0],
-                ClockRate = byte.Parse(subTokens[1]),
+                ClockRate = uint.Parse(subTokens[1]),
                 Channels = subTokens.Length > 2 ? byte.Parse(subTokens[2]) : null
             };
         }

@@ -43,7 +43,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     public HandlerInterface(string name)
     {
         _name = name;
-        _ = GetNativeRtpCapabilities();
+        //_ = GetNativeRtpCapabilities();
         sctpCapabilities = new SctpCapabilities();
         sctpCapabilities.numStreams.MIS = 1024;
         sctpCapabilities.numStreams.OS = 1024;
@@ -85,8 +85,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         if (pc == null) { Debug.Log("pc is null"); }
 
-        try
-        {
+        
             pc.AddTransceiver(TrackKind.Audio);
             pc.AddTransceiver(TrackKind.Video);
 
@@ -104,16 +103,16 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
             var nativeRtpCapabilities = CommonUtils.ExtractRtpCapabilities(sdp);
 
+            foreach (var item in nativeRtpCapabilities.Codecs)
+            {
+            Debug.Log($"codec values {item.MimeType}");
+            }
+
             // libwebrtc supports NACK for OPUS but doesn't announce it.
             OrtcUtils.AddNackSuppportForOpus(nativeRtpCapabilities);
 
             return nativeRtpCapabilities;
-        }
-        catch (Exception ex)
-        {
-            pc.Close();
-            throw new Exception(ex.Message);
-        }
+        
 
     }
 

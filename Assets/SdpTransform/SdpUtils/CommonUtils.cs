@@ -47,7 +47,7 @@ public class CommonUtils
                 RtpCodecCapability codecCap = new RtpCodecCapability
                 {
                     Kind = mediaKind,
-                    MimeType = rtp.EncodingName,
+                    MimeType = $"{mediaType.ToString().ToLower()}/{rtp.EncodingName}",
                     ClockRate = rtp.ClockRate,
                     PreferredPayloadType = rtp.PayloadType
                 };
@@ -62,8 +62,7 @@ public class CommonUtils
             {
                 Dictionary<string, object> parameters = new Dictionary<string, object>();
 
-                string[] configPayload = fmtp.Value.Split(" ");
-                string[] paramList = configPayload[1].Split(';');
+                string[] paramList = fmtp.Value.Split(';');
 
                 foreach (string pair in paramList)
                 {
