@@ -299,8 +299,8 @@ namespace Mediasoup
         public MediaStreamTrack track;
         public List<RtpEncodingParameters> encodings { get; set; } = new List<RtpEncodingParameters>();
 
-        public ProducerCodecOptions codecOptions;
-        public RtpCodecCapability codec;
+        public ProducerCodecOptions codecOptions = new ProducerCodecOptions();
+        public RtpCodecCapability codec = new RtpCodecCapability();
         public bool stopTracks;
         public bool disableTrackOnPause;
         public bool zeroRtpOnPause;

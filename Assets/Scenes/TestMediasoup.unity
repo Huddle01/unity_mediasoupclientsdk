@@ -2100,7 +2100,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _localVideoRawImage: {fileID: 70742492}
-  _remoteVideoSource: {fileID: 0}
+  _remoteVideoSource: {fileID: 889614468}
 --- !u!4 &1929480502
 Transform:
   m_ObjectHideFlags: 0
