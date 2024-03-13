@@ -115,7 +115,12 @@ namespace Mediasoup.Ortc
                     UnityEngine.Debug.Log($"Key in codec params {val}");
                     UnityEngine.Debug.Log($"Type of value is {value.GetType()}");
 
-                    if (!value.IsNumericType())
+                    int res;
+
+                    if (value.IsNumericType()) { 
+                        
+                    }
+                    else if (!int.TryParse((string) val, out res))
                     {
                         throw new InvalidCastException("invalid codec apt parameter");
                     }
@@ -1597,15 +1602,20 @@ namespace Mediasoup.Ortc
                     RtpCodecCapability matchingLocalRtxCodec = null;
                     foreach (RtpCodecCapability localCodec in localCaps.Codecs)
                     {
-                        if (localCodec != null && IsRtxMimeType(localCodec.MimeType) && Int32.Parse((string) localCodec.Parameters["apt"]) == extendedCodec.localPayloadType)
-                        {
-                            matchingLocalRtxCodec = localCodec;
-                            break;
+                        if (localCodec != null && IsRtxMimeType(localCodec.MimeType)) {
+                            byte localAptValue = ExtractApt(localCodec.Parameters["apt"]);
+                            
+                            if (localAptValue == extendedCodec.localPayloadType)
+                            {
+                                matchingLocalRtxCodec = localCodec;
+                                break;
+                            }
                         }
                     }
 
-                    RtpCodecCapability matchingRemoteRtxCodec = remoteCaps.Codecs.First(codec => IsRtxCodec(codec)
-                    && (byte) codec.Parameters["apt"] == extendedCodec.localPayloadType);
+
+                    RtpCodecCapability matchingRemoteRtxCodec = remoteCaps.Codecs.FirstOrDefault(codec => IsRtxCodec(codec)
+                    && ExtractApt(codec.Parameters["apt"]) == extendedCodec.localPayloadType);
 
                     if (matchingLocalRtxCodec != null && matchingRemoteRtxCodec != null)
                     {
@@ -1617,7 +1627,7 @@ namespace Mediasoup.Ortc
 
             foreach (RtpHeaderExtension remoteExt in remoteCaps.HeaderExtensions)
             {
-                RtpHeaderExtension matchingLocalExt = localCaps.HeaderExtensions.First(ext => MatchHeaderExtensions(ext, remoteExt));
+                RtpHeaderExtension matchingLocalExt = localCaps.HeaderExtensions.FirstOrDefault(ext => MatchHeaderExtensions(ext, remoteExt));
 
                 if (matchingLocalExt == null) continue;
 
@@ -1734,6 +1744,23 @@ namespace Mediasoup.Ortc
             rtpParameters.HeaderExtensions = videoRtpParameters.HeaderExtensions;
 
             return rtpParameters;
+        }
+
+        private static byte ExtractApt(object apt) {
+            byte localAptValue;
+            if (apt.IsNumericType())
+            {
+                localAptValue = byte.Parse(apt.ToString());
+            }
+            else
+            {
+                if (!byte.TryParse((string)apt , out localAptValue))
+                {
+                    throw new Exception("GetExtendedRtpCapabilities(): Cannot parse apt");
+                }
+            }
+
+            return localAptValue;
         }
 
     }

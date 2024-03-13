@@ -18,7 +18,7 @@ namespace Mediasoup
         private SctpCapabilities sctpCapabilities;
         private HandlerInterface handler;
         private ExtendedRtpCapabilities extendedRtpCapabilities;
-        private Dictionary<MediaKind, bool> canProduceByKind;
+        private Dictionary<MediaKind, bool> canProduceByKind = new Dictionary<MediaKind, bool>();
         private RtpCapabilities recvRtpCapabilities;
 
         public Device() 
