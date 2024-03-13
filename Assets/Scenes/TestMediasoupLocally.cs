@@ -105,10 +105,13 @@ public class TestMediasoupLocally : MonoBehaviour
 
         var jsonParsed = JObject.Parse(receivedMessage);
 
-        var receivedData = jsonParsed["data"];
+        var receivedData = jsonParsed["data"]["rtpCapabilities"].ToString();
 
+        Debug.Log($"receivedData: {receivedData}");
 
-        RtpCapabilitiesObj = JsonConvert.DeserializeObject<RtpCapabilities>((string)receivedData["rtpCapabilities"]);
+        RtpCapabilitiesObj = JsonConvert.DeserializeObject<RtpCapabilities>(receivedData);
+        Debug.Log(RtpCapabilitiesObj.Codecs.Count);
+
     }
 
 
