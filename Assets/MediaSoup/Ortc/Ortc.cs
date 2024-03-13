@@ -115,15 +115,7 @@ namespace Mediasoup.Ortc
                     UnityEngine.Debug.Log($"Key in codec params {val}");
                     UnityEngine.Debug.Log($"Type of value is {value.GetType()}");
 
-                    int res;
-
-                    if (value.IsNumericType()) { 
-                        
-                    }
-                    else if (!int.TryParse((string) val, out res))
-                    {
-                        throw new InvalidCastException("invalid codec apt parameter");
-                    }
+                    ExtractApt(value);
                 }
             }
 
@@ -937,8 +929,8 @@ namespace Mediasoup.Ortc
                         throw new Exception("\"apt\" key is not exists.");
                     }
 
-                    var apiInteger = 0;
-                    apiInteger = Convert.ToInt32(apt);
+                    byte apiInteger = 0;
+                    apiInteger = ExtractApt(apt);
 
                     // Search for the associated media codec.
                     var associatedMediaCodec = consumerParams.Codecs.FirstOrDefault(mediaCodec => mediaCodec.PayloadType == apiInteger);
@@ -1253,7 +1245,7 @@ namespace Mediasoup.Ortc
             return true;
         }
 
-        private static bool MatchCodecsWithPayloadTypeAndApt(int? payloadType, IDictionary<string, object> parameters)
+        private static bool MatchCodecsWithPayloadTypeAndApt(byte? payloadType, IDictionary<string, object> parameters)
         {
             if (payloadType == null && parameters == null)
             {
@@ -1270,7 +1262,7 @@ namespace Mediasoup.Ortc
                 return false;
             }
 
-            var aptInteger = Convert.ToInt32(apt);
+            var aptInteger = ExtractApt(apt);
 
             return payloadType == aptInteger;
         }
@@ -1312,7 +1304,7 @@ namespace Mediasoup.Ortc
                         MimeType = $"{extendedCodec.kind}/rtx",
                         PayloadType = extendedCodec.remoteRtxPayloadType.Value,
                         ClockRate = extendedCodec.clockRate,
-                        Parameters = new Dictionary<string, object> { { "apt", extendedCodec.remotePayloadType.ToString() } },
+                        Parameters = new Dictionary<string, object> { { "apt", extendedCodec.remotePayloadType } },
                         RtcpFeedback = new List<RtcpFeedback>()
                     };
 
@@ -1406,7 +1398,7 @@ namespace Mediasoup.Ortc
                     Kind = extendedCodec.kind,
                     PreferredPayloadType = extendedCodec.remoteRtxPayloadType.Value,
                     ClockRate = extendedCodec.clockRate,
-                    Parameters = new Dictionary<string, object> { { "apt", extendedCodec.remotePayloadType.ToString() } },
+                    Parameters = new Dictionary<string, object> { { "apt", extendedCodec.remotePayloadType } },
                     RtcpFeedback = new List<RtcpFeedback>()
                 };
 
@@ -1475,7 +1467,7 @@ namespace Mediasoup.Ortc
                         MimeType = $"{extendedCodec.kind}/rtx",
                         PayloadType = extendedCodec.localRtxPayloadType.Value,
                         ClockRate = extendedCodec.clockRate,
-                        Parameters = new Dictionary<string, object> { { "apt", extendedCodec.localPayloadType.ToString() } },
+                        Parameters = new Dictionary<string, object> { { "apt", extendedCodec.localPayloadType } },
                         RtcpFeedback = new List<RtcpFeedback>()
                     };
 
@@ -1756,7 +1748,7 @@ namespace Mediasoup.Ortc
             {
                 if (!byte.TryParse((string)apt , out localAptValue))
                 {
-                    throw new Exception("GetExtendedRtpCapabilities(): Cannot parse apt");
+                    throw new InvalidCastException("GetExtendedRtpCapabilities(): Cannot parse apt");
                 }
             }
 
