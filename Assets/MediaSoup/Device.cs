@@ -23,7 +23,7 @@ namespace Mediasoup
 
         public Device() 
         {
-        
+            handler = new HandlerInterface("Unity");
         }
 
         ~Device() 
