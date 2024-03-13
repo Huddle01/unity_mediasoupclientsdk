@@ -94,11 +94,11 @@ public class TestMediasoupLocally : MonoBehaviour
 
     public async void GetRtpCapabilities() 
     {
-        var encoded = Encoding.UTF8.GetBytes("getRtpCapabilities");
-        var buffer = new ArraySegment<byte>(encoded, 0, encoded.Length);
+        var data = new { type = "getRtpCapabilities", data = "" };
+        var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
 
         Debug.Log($"Sending Message: getRtpCapabilities");
-        await _websocket.SendAsync(encoded,WebSocketMessageType.Text,true,CancellationToken.None);
+        await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text,true,CancellationToken.None);
 
         string receivedMessage = await ReceiveMessage(_websocket);
         Debug.Log($"Received: {receivedMessage}");
