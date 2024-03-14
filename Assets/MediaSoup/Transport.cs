@@ -918,18 +918,18 @@ namespace Mediasoup.Transports
         server
     }
 
-    [JsonConverter(typeof(StringEnumConverter))]
+    [JsonConverter(typeof(StringEnumConverterWithAttribute))]
     public enum FingerPrintAlgorithm
     {
-        [StringValue("sha-1")]
+        [System.StringValue("sha-1")]
         sha1,
-        [StringValue("sha-224")]
+        [System.StringValue("sha-224")]
         sha224,
-        [StringValue("sha-256")]
+        [System.StringValue("sha-256")]
         sha256,
-        [StringValue("sha-384")]
+        [System.StringValue("sha-384")]
         sha384,
-        [StringValue("sha-512")]
+        [System.StringValue("sha-512")]
         sha512
     }
 

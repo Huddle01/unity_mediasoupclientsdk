@@ -49,9 +49,9 @@ public class TestMediasoupLocally : MonoBehaviour
     // Start is called before the first frame update
     async void Start()
     {
-        ProducerOptionsObj = new ProducerOptions<AppData> 
+        ProducerOptionsObj = new ProducerOptions<AppData>
         {
-            encodings = {   new RtpEncodingParameters 
+            encodings = {   new RtpEncodingParameters
                             {
                                 Rid = "r0",
                                 MaxBitrate = 100000,
@@ -77,28 +77,28 @@ public class TestMediasoupLocally : MonoBehaviour
 
         Uri serverUrl = new Uri(_socketUrl);
         _tokenSource = new CancellationToken();
-        await _websocket.ConnectAsync(serverUrl,CancellationToken.None);
+        await _websocket.ConnectAsync(serverUrl, CancellationToken.None);
         Debug.Log($"Connection successfully with {_websocket.State.ToString()}");
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+
     }
 
-    public void GetLocalVideo() 
+    public void GetLocalVideo()
     {
         StartCoroutine(CaptureWebCamVideo());
     }
 
-    public async void GetRtpCapabilities() 
+    public async void GetRtpCapabilities()
     {
         var data = new { type = "getRtpCapabilities", data = "" };
         var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
 
         Debug.Log($"Sending Message: getRtpCapabilities");
-        await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text,true,CancellationToken.None);
+        await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
 
         string receivedMessage = await ReceiveMessage(_websocket);
         Debug.Log($"Received: {receivedMessage}");
@@ -115,7 +115,7 @@ public class TestMediasoupLocally : MonoBehaviour
     }
 
 
-    public async void CreateDevice() 
+    public async void CreateDevice()
     {
         DeviceObj = new Device();
         await DeviceObj.Load(RtpCapabilitiesObj);
@@ -135,17 +135,31 @@ public class TestMediasoupLocally : MonoBehaviour
         var jsonParsed = JObject.Parse(receivedMessage);
 
         string id = (string)jsonParsed["id"];
+        
         IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>(jsonParsed["data"]["iceParameters"].ToString());
+        
         List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>(jsonParsed["data"]["iceCandidates"].ToString());
+
         DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>(jsonParsed["data"]["dtlsParameters"].ToString());
-        SctpParameters sctpParameters = JsonConvert.DeserializeObject<SctpParameters>(jsonParsed["data"]["sctpParameters"].ToString());
-        List<RTCIceServer> iceServers = JsonConvert.DeserializeObject<List<RTCIceServer>>(jsonParsed["data"]["iceServers"].ToString());
-        RTCIceTransportPolicy iceTransportPolicy = JsonConvert.DeserializeObject<RTCIceTransportPolicy>(jsonParsed["data"]["iceTransportPolicy"].ToString());
-        object additionalSettings = JsonConvert.DeserializeObject<object>(jsonParsed["data"]["additionalSettings"].ToString());
-        object proprietaryConstraints = JsonConvert.DeserializeObject<object>(jsonParsed["data"]["proprietaryConstraints"].ToString());
+
+        SctpParameters sctpParameters = null; 
+        if (jsonParsed["data"]["sctpParameters"] != null) JsonConvert.DeserializeObject<SctpParameters>(jsonParsed["data"]["sctpParameters"].ToString());
+        
+        List<RTCIceServer> iceServers = null;
+        if (jsonParsed["data"]["iceServers"] != null) JsonConvert.DeserializeObject<List<RTCIceServer>>(jsonParsed["data"]["iceServers"].ToString());
+        
+        RTCIceTransportPolicy iceTransportPolicy = RTCIceTransportPolicy.All;
+        if (jsonParsed["data"]["iceTransportPolicy"] != null) JsonConvert.DeserializeObject<RTCIceTransportPolicy>(jsonParsed["data"]["iceTransportPolicy"].ToString());
+        
+        object additionalSettings = null;
+        if (jsonParsed["data"]["additionalSettings"] != null) JsonConvert.DeserializeObject<object>(jsonParsed["data"]["additionalSettings"].ToString());
+        
+        object proprietaryConstraints = null;
+        if (jsonParsed["data"]["proprietaryConstraints"] != null) JsonConvert.DeserializeObject<object>(jsonParsed["data"]["proprietaryConstraints"].ToString());
+        
         AppData appData = new AppData();
         SendTransport = DeviceObj.CreateSendTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
-                                                iceTransportPolicy, additionalSettings, proprietaryConstraints,appData);
+                                                iceTransportPolicy, additionalSettings, proprietaryConstraints, appData);
 
         SendTransport.On("connect", async (args) =>
         {
@@ -218,7 +232,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
     }
 
-    private async Task<int> GetProducerId(TrackKind kind, RtpParameters rtp, AppData _appdata) 
+    private async Task<int> GetProducerId(TrackKind kind, RtpParameters rtp, AppData _appdata)
     {
         return _producerId;
     }
@@ -336,7 +350,7 @@ public class TestMediasoupLocally : MonoBehaviour
         float aspectRatio = textureSize.x / textureSize.y;
         RectTransform videoRect = _localVideoRawImage.GetComponent<RectTransform>();
 
-        videoRect.sizeDelta = new Vector2(videoRect.sizeDelta.x, videoRect.sizeDelta.y* aspectRatio);
+        videoRect.sizeDelta = new Vector2(videoRect.sizeDelta.x, videoRect.sizeDelta.y * aspectRatio);
         //_webCamStreamingTexture = new Texture2D(1280, 720, GraphicsFormat.B8G8R8A8_UNorm, TextureCreationFlags.None);
         _webCamStreamingTexture = _webCamTexture;
 

@@ -57,6 +57,7 @@ public class RemoteSdp
 
 
         sdpObject.MediaDescriptions = new List<MediaDescription>();
+        sdpObject.Attributes = new Attributes();
 
         // If ICE parameters are given, add ICE-Lite indicator.
         if (_iceParameters != null && _iceParameters.iceLite)

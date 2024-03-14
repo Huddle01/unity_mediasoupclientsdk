@@ -111,9 +111,6 @@ namespace Mediasoup.Ortc
                 // Specific parameters validation.
                 if (key == "apt")
                 {
-                    UnityEngine.Debug.Log($"Key in codec params {key}");
-                    UnityEngine.Debug.Log($"Key in codec params {val}");
-                    UnityEngine.Debug.Log($"Type of value is {value.GetType()}");
 
                     ExtractApt(value);
                 }

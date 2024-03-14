@@ -1,4 +1,6 @@
 ﻿using Mediasoup.RtpParameter;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
@@ -6,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Unity.VisualScripting;
+using UnityEngine;
 
 namespace System
 {
@@ -166,6 +169,48 @@ namespace System
         }
 
         #endregion RawConstantValue
+
+        #region StringValueAttribute
+        public static string GetStringValue(this Enum value)
+        {
+            var type = value.GetType();
+            var field = type.GetField(value.ToString());
+            var attribute = (StringValueAttribute) field.GetCustomAttributes(typeof(StringValueAttribute), false)[0];
+            return attribute.Value;
+        }
+
+        #endregion
+    }
+
+    public class StringValueAttribute : Attribute
+    {
+        public string Value { get; }
+
+        public StringValueAttribute(string value)
+        {
+            Value = value;
+        }
+    }
+
+    public class StringEnumConverterWithAttribute : StringEnumConverter
+    {
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            Type type = objectType.IsGenericType && objectType.GetGenericTypeDefinition() == typeof(Nullable<>) ? Nullable.GetUnderlyingType(objectType) : objectType;
+            //Debug.Log($"Type of object is: {type}");
+            if (!type.IsEnum) return base.ReadJson(reader, objectType, existingValue, serializer);
+
+            string enumText = reader.Value.ToString();
+            //Debug.Log($"enumText: {enumText}");
+            foreach (FieldInfo fieldInfo in type.GetFields())
+            {
+                StringValueAttribute[] attributes = (StringValueAttribute[]) fieldInfo.GetCustomAttributes(typeof(StringValueAttribute), false);
+                if (attributes.Length > 0 && attributes[0].Value == enumText)
+                    return Enum.Parse(type, fieldInfo.Name);
+            }
+
+            return base.ReadJson(reader, objectType, existingValue, serializer);
+        }
     }
 }
 

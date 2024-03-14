@@ -105,7 +105,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
             foreach (var item in nativeRtpCapabilities.Codecs)
             {
-            Debug.Log($"codec values {item.MimeType}");
+            //Debug.Log($"codec values {item.MimeType}");
             }
 
             // libwebrtc supports NACK for OPUS but doesn't announce it.
