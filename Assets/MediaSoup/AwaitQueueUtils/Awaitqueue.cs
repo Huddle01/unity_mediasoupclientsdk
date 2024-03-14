@@ -30,154 +30,69 @@ public class AwaitQueueRemovedTaskError : Exception
 
 public class AwaitQueue
 {
-    private readonly Dictionary<int, PendingTask> pendingTasks = new Dictionary<int, PendingTask>();
-    private int nextTaskId = 0;
-    private bool stopping = false;
+    private readonly Queue<Func<Task>> _tasks = new Queue<Func<Task>>();
+    private bool _isExecuting = false;
 
-    public int Size => pendingTasks.Count;
-
-    public async Task Push(AwaitQueueTask<object> task, string name = null)
+    public Task<T> Push<T>(Func<Task<T>> taskGenerator,string name)
     {
-        name = name ?? task.Method.Name;
+        var tcs = new TaskCompletionSource<T>();
 
-        Console.WriteLine($"Push() [name:{name}]");
-
-        _ = await Task.Run<object>(() =>
+        EnqueueInternal(async () =>
         {
-            var pendingTask = new PendingTask
+            try
             {
-                Id = nextTaskId++,
-                Task = task,
-                Name = name,
-                EnqueuedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                ExecutedAt = null,
-                Completed = false,
-            };
+                var result = await taskGenerator();
+                tcs.SetResult(result);
+            }
+            catch (Exception ex)
+            {
+                // If the task fails, forward the exception to the TaskCompletionSource
+                tcs.SetException(ex);
+            }
+        });
 
-            pendingTask.Reject = (error) => 
+        return tcs.Task;
+    }
+
+    private void EnqueueInternal(Func<Task> taskGenerator)
+    {
+        bool shouldStart = false;
+
+        lock (_tasks)
+        {
+            _tasks.Enqueue(taskGenerator);
+            if (!_isExecuting)
             {
-                if (pendingTask.Completed)
+                _isExecuting = true;
+                shouldStart = true;
+            }
+        }
+
+        if (shouldStart)
+        {
+            Task.Run(async () => await StartExecuting());
+        }
+    }
+
+    private async Task StartExecuting()
+    {
+        while (true)
+        {
+            Func<Task> taskGenerator;
+
+            lock (_tasks)
+            {
+                if (_tasks.Count == 0)
                 {
+                    _isExecuting = false;
                     return;
                 }
 
-                pendingTask.Completed = true;
-
-                pendingTasks.Remove(pendingTask.Id);
-
-                if (!stopping)
-                {
-                    var nextPendingTask = pendingTasks.Values.FirstOrDefault();
-
-                    if (nextPendingTask != null && !nextPendingTask.ExecutedAt.HasValue)
-                    {
-                        Execute(nextPendingTask);
-                    }
-                }
-            };
-
-            pendingTask.Resolve = (result) =>
-            {
-                if (pendingTask.Completed)
-                {
-                    return;
-                }
-
-                pendingTask.Completed = true;
-
-                pendingTasks.Remove(pendingTask.Id);
-
-                var nextPendingTask = pendingTasks.Values.FirstOrDefault();
-
-                if (nextPendingTask != null && !nextPendingTask.ExecutedAt.HasValue)
-                {
-                    Execute(nextPendingTask);
-                }
-            };
-
-            pendingTasks.Add(pendingTask.Id, pendingTask);
-
-            if (pendingTasks.Count == 1)
-            {
-                Execute(pendingTask);
+                taskGenerator = _tasks.Dequeue();
             }
 
-            return default(object);
-
-        });
-    }
-
-    public void Stop()
-    {
-        Console.WriteLine("Stop()");
-
-        stopping = true;
-
-        foreach (var pendingTask in pendingTasks.Values)
-        {
-            Console.WriteLine($"Stopping task [name:{pendingTask.Name}]");
-
-            pendingTask.Reject(new AwaitQueueStoppedError());
-        }
-
-        stopping = false;
-    }
-
-    public void Remove(int taskIdx)
-    {
-        Console.WriteLine($"Remove() [taskIdx:{taskIdx}]");
-
-        var pendingTask = pendingTasks.Values.ElementAtOrDefault(taskIdx);
-
-        if (pendingTask != null)
-        {
-            pendingTask.Reject(new AwaitQueueRemovedTaskError());
-        }
-        else
-        {
-            Console.WriteLine($"No task with the given index [taskIdx:{taskIdx}]");
-        }
-    }
-
-    public List<AwaitQueueTaskDump> Dump()
-    {
-        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var idx = 0;
-
-        return pendingTasks.Values.Select(pendingTask => new AwaitQueueTaskDump
-        {
-            Idx = idx++,
-            Task = pendingTask.Task,
-            Name = pendingTask.Name,
-            EnqueuedTime = pendingTask.ExecutedAt.HasValue
-                ? pendingTask.ExecutedAt.Value - pendingTask.EnqueuedAt
-                : now - pendingTask.EnqueuedAt,
-            ExecutionTime = pendingTask.ExecutedAt.HasValue
-                ? now - pendingTask.ExecutedAt.Value
-                : 0
-        }).ToList();
-    }
-
-    private async void Execute(PendingTask pendingTask)
-    {
-        Console.WriteLine($"Execute() [name:{pendingTask.Name}]");
-
-        if (pendingTask.ExecutedAt.HasValue)
-        {
-            throw new InvalidOperationException("Task already being executed");
-        }
-
-        pendingTask.ExecutedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-        try
-        {
-            var result = pendingTask.Task.Invoke();
-
-            pendingTask.Resolve(result);
-        }
-        catch (Exception error)
-        {
-            pendingTask.Reject(error);
+            // Execute the task outside of the lock to allow for other tasks to be enqueued.
+            await taskGenerator();
         }
     }
 }

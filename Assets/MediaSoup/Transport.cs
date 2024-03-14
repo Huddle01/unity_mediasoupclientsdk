@@ -236,7 +236,7 @@ namespace Mediasoup.Transports
             }, "transport.RestartIceAsync");
         }
 
-        public Task UpdateIceServers(List<RTCIceServer> iceServers)
+        public async Task UpdateIceServers(List<RTCIceServer> iceServers)
         {
             if (isClosed)
             {
@@ -247,10 +247,10 @@ namespace Mediasoup.Transports
                 throw new ArgumentNullException("missing iceParameters");
             }
 
-            return awaitQueue.Push(async () =>
+            _ = awaitQueue.Push<bool>(async () =>
             {
-                await handlerInterface.UpdateIceServers(iceServers);
-                return new object();
+                await handlerInterface.UpdateIceServers(iceServers); 
+                return true;
 
             }, "transport.UpdateIceServers");
 
@@ -285,10 +285,13 @@ namespace Mediasoup.Transports
                 throw new InvalidCastException("if given, appData must be an object");
             }
 
-            Producer<ProducerAppData> producer = null;
 
-            await awaitQueue.Push(async () =>
+            Task<Producer<ProducerAppData>> producerTask = null;
+
+            Task<bool> TaskCompleted;
+            producerTask =  awaitQueue.Push<Producer<ProducerAppData>>(async () =>
             {
+                Debug.Log($"Start creating producer");
                 List<RtpEncodingParameters> normalizedEncodings = new List<RtpEncodingParameters>();
 
                 if (options.encodings == null)
@@ -302,7 +305,6 @@ namespace Mediasoup.Transports
                      normalizedEncodings = options.encodings.Select(encoding =>
                     {
                         RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters {Active = encoding.Active };
-
 
                         normalizedEncoding.Dtx = encoding.Dtx;
                         normalizedEncoding.ScalabilityMode = encoding.ScalabilityMode;
@@ -333,15 +335,17 @@ namespace Mediasoup.Transports
                     //Adding a func param so that a method can be injected which can provide producer id
                     int num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters,appData);
 
-                    producer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId, 
+                    Producer<ProducerAppData>  tempproducer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId, 
                         handlerSendResult.rtpSender,options.track, handlerSendResult.rtpParameters,options.stopTracks,
                         options.disableTrackOnPause,options.zeroRtpOnPause, options.appData);
 
-                    producers.Add(producer.id, producer);
-                    HandleProducer(producer);
+                    producers.Add(tempproducer.id, tempproducer);
+                    HandleProducer(tempproducer);
 
-                    _ = await observer.SafeEmit("newproducer",producer);
-                    return producer;
+                    Debug.Log($"Return Producer async");
+
+                    _ = await observer.SafeEmit("newproducer", tempproducer);
+                    return tempproducer;
 
                 } catch (Exception ex) 
                 {
@@ -349,7 +353,7 @@ namespace Mediasoup.Transports
                 }
             }, "transport.resumePendingConsumers");
 
-            return producer;
+            return producerTask;
         }
 
         public async Task<Consumer<AppData>> ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null) where ConsumerAppData : AppData, new()

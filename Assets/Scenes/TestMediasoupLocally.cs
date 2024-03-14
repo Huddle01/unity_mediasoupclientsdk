@@ -90,6 +90,7 @@ public class TestMediasoupLocally : MonoBehaviour
     public void GetLocalVideo()
     {
         StartCoroutine(CaptureWebCamVideo());
+        ProducerOptionsObj.track = new VideoStreamTrack(_webCamTexture);
     }
 
     public async void GetRtpCapabilities()
@@ -111,7 +112,6 @@ public class TestMediasoupLocally : MonoBehaviour
 
         RtpCapabilitiesObj = JsonConvert.DeserializeObject<RtpCapabilities>(receivedData);
         Debug.Log(RtpCapabilitiesObj.Codecs.Count);
-
     }
 
 
@@ -218,6 +218,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
     public async void ConnectSendTransportAndProduce()
     {
+        
         ProducerObj = await SendTransport.ProduceAsync(GetProducerId, ProducerOptionsObj);
 
         ProducerObj.On("trackended", async (args) =>
