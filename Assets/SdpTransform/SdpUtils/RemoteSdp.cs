@@ -101,7 +101,11 @@ public class RemoteSdp
 
             sdpObject.Attributes.Fingerprint = fingerPrint;
 
-            sdpObject.Attributes.Group = new Group { Semantics = GroupSemantics.Bundle };
+            sdpObject.Attributes.Group = new Group 
+            {
+                Semantics = GroupSemantics.Bundle,
+                SemanticsExtensions = new string[] {"audio","video"}
+            };
 
         }
 
@@ -165,11 +169,11 @@ public class RemoteSdp
     {
         AnswerMediaSection asnwerMediaSection = new AnswerMediaSection(iceParameters,iceCandidates,dtlsParameters,null,plainRtpParameters,
                                                     planB,_offerMediaObject,_offerRtp,_answerRtp,_codecOptions,_extmapAllowMixed);
-
-        if (string.IsNullOrEmpty(_resuedMid))
+        Debug.Log(_resuedMid);
+        if (!string.IsNullOrEmpty(_resuedMid))
         {
             ReplaceMediaSection(asnwerMediaSection, _resuedMid);
-        } else if (midToIndex.ContainsKey(asnwerMediaSection.mid))
+        } else if (!midToIndex.ContainsKey(asnwerMediaSection.mid))
         {
             AddMediaSection(asnwerMediaSection);
         }
@@ -338,7 +342,7 @@ public class RemoteSdp
         {
             int idx = -1;
 
-            if (!midToIndex.TryGetValue(_resuedMid, out idx))
+            if (!midToIndex.TryGetValue(_newMediaSection.mid, out idx))
             {
                 throw new Exception($"no media section found with mid '${_resuedMid}'");
             }
@@ -365,11 +369,12 @@ public class RemoteSdp
     {
         if (dtlsParameters == null) return;
 
-        if (sdpObject.Attributes.Group.SemanticsExtensions!=null && sdpObject.Attributes.Group.SemanticsExtensions.Length>0)
+        if (sdpObject.Attributes.Group.SemanticsExtensions!=null && sdpObject.Attributes.Group.SemanticsExtensions.Length > 0)
         {
             sdpObject.Attributes.Group.SemanticsExtensions[0] = string.Join(' ', mediaSections
                 .Where(mediaSection => !mediaSection.isClosed)
                 .Select(mediaSection => mediaSection.mid));
+
         }
     }
 }

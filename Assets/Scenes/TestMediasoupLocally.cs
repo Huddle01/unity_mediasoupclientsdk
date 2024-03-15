@@ -70,7 +70,8 @@ public class TestMediasoupLocally : MonoBehaviour
                             }
                         },
 
-            codecOptions = { videoGoogleStartBitrate = 1000 }
+            codecOptions = { videoGoogleStartBitrate = 1000 },
+            codec = {MimeType = "video/VP8",ClockRate = 90000 },
         };
 
         _websocket = new ClientWebSocket();

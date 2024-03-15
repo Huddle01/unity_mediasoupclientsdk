@@ -22,11 +22,6 @@ namespace Mediasoup
             {
                 return default;
             }
-            else if (double.IsNaN(Convert.ToDouble(value)))
-            {
-                // Assuming T is a numeric type (e.g., double) for the NaN check.
-                return (T)(object)double.NaN;
-            }
             else
             {
                 // Assuming T is a reference type or a value type that can be serialized/deserialized.

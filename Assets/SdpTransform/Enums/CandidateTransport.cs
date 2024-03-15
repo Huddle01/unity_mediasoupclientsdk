@@ -6,10 +6,10 @@ namespace Utilme.SdpTransform
     [JsonConverter(typeof(StringEnumConverter))]
     public enum CandidateTransport
     {
-        [StringValue("host")]
+        [StringValue("udp")]
         Udp,
 
-        [StringValue("host")]
+        [StringValue("tcp")]
         Tcp
     }
 }

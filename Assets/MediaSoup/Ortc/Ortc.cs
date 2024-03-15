@@ -1109,6 +1109,7 @@ namespace Mediasoup.Ortc
 
         private static bool IsRtxMimeType(string mimeType)
         {
+            if (string.IsNullOrEmpty(mimeType)) return false;
             return RtxMimeTypeRegex.IsMatch(mimeType);
         }
 
@@ -1151,6 +1152,10 @@ namespace Mediasoup.Ortc
         {
             var aMimeType = aCodec.MimeType.ToLower();
             var bMimeType = bCodec.MimeType.ToLower();
+
+            UnityEngine.Debug.Log($"aMimeType {aMimeType}  bMimeType {bMimeType}");
+            UnityEngine.Debug.Log($"aCodec.ClockRate {aCodec.ClockRate}  bCodec.ClockRate {bCodec.ClockRate}");
+            UnityEngine.Debug.Log($"aCodec.Channels {aCodec.Channels}  bCodec.Channels {bCodec.Channels}");
 
             if (aMimeType != bMimeType || aCodec.ClockRate != bCodec.ClockRate || aCodec.Channels != bCodec.Channels)
             {
@@ -1511,13 +1516,17 @@ namespace Mediasoup.Ortc
             else {
                 for (var idx = 0; idx < codecs.Count; ++idx)
                 {
+                    UnityEngine.Debug.Log($"Codec[idx] : {codecs[idx].MimeType}, capcodec {capCodec.MimeType}");
                     if (MatchCodecs(codecs[idx], capCodec))
                     {
                         filteredCodecs.Add(codecs[idx]);
 
-                        if (codecs != null && IsRtxMimeType(codecs[idx + 1].MimeType))
+                        if (idx == codecs.Count-2) 
                         {
-                            filteredCodecs.Add(codecs[idx + 1]);
+                            if (codecs != null && IsRtxMimeType(codecs[idx + 1].MimeType))
+                            {
+                                filteredCodecs.Add(codecs[idx + 1]);
+                            }
                         }
 
                         break;

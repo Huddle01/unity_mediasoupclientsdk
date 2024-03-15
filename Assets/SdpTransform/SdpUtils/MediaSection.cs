@@ -26,6 +26,8 @@ public class MediaSection
     public MediaSection(IceParameters _iceParameters,List<IceCandidate> _iceCandidates,DtlsParameters _dtlsParameters,bool _planB) 
     {
         _mediaObject = new MediaDescription();
+        _mediaObject.Attributes = new Attributes();
+        _mediaObject.Fmts = new List<string>();
         planB = _planB;
 
         if (_iceParameters!=null) SetIceParameters(_iceParameters);
@@ -83,6 +85,10 @@ public class MediaSection
 
     public void SetIceParameters(IceParameters _iceParameters) 
     {
+        Debug.Log(_mediaObject is null);
+        Debug.Log(_mediaObject.Attributes is null);
+        _mediaObject.Attributes.IceUfrag = new IceUfrag();
+        _mediaObject.Attributes.IcePwd = new IcePwd();
         _mediaObject.Attributes.IceUfrag.Ufrag = _iceParameters.usernameFragment;
         _mediaObject.Attributes.IcePwd.Password = _iceParameters.password;
     }

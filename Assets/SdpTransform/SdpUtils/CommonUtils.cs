@@ -227,7 +227,7 @@ public class CommonUtils
     {
         Ssrc ssrc = null;
 
-        if (offerMediaObject != null && offerMediaObject.Attributes.Ssrcs.Count > 0)
+        if (offerMediaObject != null && offerMediaObject.Attributes.Ssrcs!=null && offerMediaObject.Attributes.Ssrcs .Count > 0)
         {
             ssrc = offerMediaObject.Attributes.Ssrcs.FirstOrDefault<Ssrc>(x => x.Attribute.ToLower() == "cname");
         }

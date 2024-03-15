@@ -285,75 +285,78 @@ namespace Mediasoup.Transports
                 throw new InvalidCastException("if given, appData must be an object");
             }
 
+            Debug.Log($"Start creating producer");
+            List<RtpEncodingParameters> normalizedEncodings = new List<RtpEncodingParameters>();
 
-            Task<Producer<ProducerAppData>> producerTask = null;
-
-            Task<bool> TaskCompleted;
-            producerTask =  awaitQueue.Push<Producer<ProducerAppData>>(async () =>
+            if (options.encodings == null)
             {
-                Debug.Log($"Start creating producer");
-                List<RtpEncodingParameters> normalizedEncodings = new List<RtpEncodingParameters>();
+                throw new ArgumentException("encodings must be an array");
+            }
+            else if (options.encodings.Count == 0)
+            {
+                normalizedEncodings = null;
+            }
+            else if (options.encodings != null)
+            {
+                normalizedEncodings = options.encodings.Select(encoding =>
+                {
+                    RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters { Active = encoding.Active };
 
-                if (options.encodings == null)
-                {
-                    throw new ArgumentException("encodings must be an arra");
-                } else if (options.encodings.Count == 0)
-                {
-                    normalizedEncodings = null;
-                } else if (options.encodings!=null) 
-                {
-                     normalizedEncodings = options.encodings.Select(encoding =>
-                    {
-                        RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters {Active = encoding.Active };
-
-                        normalizedEncoding.Dtx = encoding.Dtx;
-                        normalizedEncoding.ScalabilityMode = encoding.ScalabilityMode;
+                    normalizedEncoding.Dtx = encoding.Dtx;
+                    normalizedEncoding.ScalabilityMode = encoding.ScalabilityMode;
+                    if (encoding.ScaleResolutionDownBy.HasValue)
                         normalizedEncoding.ScaleResolutionDownBy = encoding.ScaleResolutionDownBy.Value;
+                    if (encoding.MaxBitrate.HasValue)
                         normalizedEncoding.MaxBitrate = encoding.MaxBitrate.Value;
+                    if (encoding.MaxFramerate.HasValue)
                         normalizedEncoding.MaxFramerate = encoding.MaxFramerate.Value;
+                    if (encoding.AdaptivePtime.HasValue)
                         normalizedEncoding.AdaptivePtime = encoding.AdaptivePtime.Value;
-                        normalizedEncoding.priority = encoding.priority;
+                    if (encoding.priority.HasValue)
+                        normalizedEncoding.priority = encoding.priority.Value;
+                    if (encoding.networkPriority.HasValue)
                         normalizedEncoding.networkPriority = encoding.networkPriority;
 
-                        return normalizedEncoding;
-                    }).ToList();
-                }
+                    return normalizedEncoding;
+                }).ToList();
+            }
 
-                HandlerSendOptions handlerSendOptions = new HandlerSendOptions
-                {
-                    track = options.track,
-                    codec = options.codec,
-                    codecOptions = options.codecOptions,
-                    encodings = normalizedEncodings
-                };
+            HandlerSendOptions handlerSendOptions = new HandlerSendOptions
+            {
+                track = options.track,
+                codec = options.codec,
+                codecOptions = options.codecOptions,
+                encodings = normalizedEncodings
+            };
 
-                HandlerSendResult handlerSendResult = await handlerInterface.Send(handlerSendOptions);
-                try 
-                {
-                    ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
+            HandlerSendResult handlerSendResult = await handlerInterface.Send(handlerSendOptions);
 
-                    //Adding a func param so that a method can be injected which can provide producer id
-                    int num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters,appData);
+            Producer<ProducerAppData> tempproducer = null;
 
-                    Producer<ProducerAppData>  tempproducer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId, 
-                        handlerSendResult.rtpSender,options.track, handlerSendResult.rtpParameters,options.stopTracks,
-                        options.disableTrackOnPause,options.zeroRtpOnPause, options.appData);
+            try
+            {
+                ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
 
-                    producers.Add(tempproducer.id, tempproducer);
-                    HandleProducer(tempproducer);
+                //Adding a func param so that a method can be injected which can provide producer id
+                int num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters, appData);
 
-                    Debug.Log($"Return Producer async");
+                tempproducer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId,
+                    handlerSendResult.rtpSender, options.track, handlerSendResult.rtpParameters, options.stopTracks,
+                    options.disableTrackOnPause, options.zeroRtpOnPause, options.appData);
 
-                    _ = await observer.SafeEmit("newproducer", tempproducer);
-                    return tempproducer;
+                producers.Add(tempproducer.id, tempproducer);
+                HandleProducer(tempproducer);
 
-                } catch (Exception ex) 
-                {
-                    throw new ArgumentException();
-                }
-            }, "transport.resumePendingConsumers");
+                Debug.Log($"Return Producer async");
 
-            return producerTask;
+                _ = await observer.SafeEmit("newproducer", tempproducer);
+                return tempproducer;
+            }
+            catch (Exception ex) 
+            {
+                throw new Exception($"Cant produce {ex.Message}");
+            }
+
         }
 
         public async Task<Consumer<AppData>> ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null) where ConsumerAppData : AppData, new()

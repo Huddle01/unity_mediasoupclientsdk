@@ -105,10 +105,8 @@ namespace Utilme.SdpTransform
                         if (md is not null)
                             sdp.MediaDescriptions.Add(md);
 
-                        Debug.Log($"Extract Media description");
                         md = token.ToMediaDescription();
 
-                        Debug.Log($"Extract Media description value {md.Media.ToString()}");
                     }
                     else if (token.StartsWith(Sdp.InformationIndicator))
                         md.Information = token.ToInformation();
@@ -266,8 +264,11 @@ namespace Utilme.SdpTransform
                 sb.Append($"{Sdp.AttributeIndicator}{Attributes.IceLiteLabel}{Sdp.CRLF}");
 
             // Session value attributes.
-            if (sdp.Attributes.Group is not null)
+            if (sdp.Attributes.Group is not null) 
+            {
                 sb.Append(sdp.Attributes.Group.ToText());
+            }
+                
             if (sdp.Attributes.MsidSemantic is not null)
                 sb.Append(sdp.Attributes.MsidSemantic.ToText());
             if (sdp.Attributes.Fingerprint is not null)
@@ -690,12 +691,18 @@ namespace Utilme.SdpTransform
             };
         }
 
-        public static string ToText(this MediaDescription mediaDescription) =>
-            $"{Sdp.MediaDescriptionIndicator}" +
-                $"{mediaDescription.Media.GetStringValue()} {mediaDescription.Port} {mediaDescription.Proto} " +
-                $"{string.Join(" ", mediaDescription.Fmts.ToArray())}" +
-                $"{Sdp.CRLF}";
-
+        public static string ToText(this MediaDescription mediaDescription) 
+        {
+            Debug.Log($"Media Des Check {mediaDescription is null}");
+            Debug.Log($"Media Des Check {mediaDescription.Port}");
+            Debug.Log($"Media Des Check {mediaDescription.Proto}");
+            Debug.Log($"Media Des Check {mediaDescription.Fmts is null}");
+            return $"{Sdp.MediaDescriptionIndicator}" +
+                    $"{mediaDescription.Media.GetStringValue()} {mediaDescription.Port} {mediaDescription.Proto} " +
+                    $"{string.Join(" ", mediaDescription.Fmts.ToArray())}" +
+                    $"{Sdp.CRLF}";
+        }
+            
 
         // Attributes.
 
@@ -705,6 +712,9 @@ namespace Utilme.SdpTransform
                  .Replace(Sdp.AttributeIndicator, string.Empty)
                  .Replace(Group.Label, string.Empty)
                  .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            Debug.Log($"Grop Value {tokens.Skip(1).ToArray().Length}");
+
             return new Group
             {
                 Semantics = tokens[0].EnumFromStringValue<GroupSemantics>(),
@@ -712,10 +722,17 @@ namespace Utilme.SdpTransform
             };
         }
 
-        public static string ToText(this Group group) =>
-            $"{Sdp.AttributeIndicator}{Group.Label}{group.Semantics.GetStringValue()} " +
-                $"{string.Join(" ", group.SemanticsExtensions)}" +
-                $"{Sdp.CRLF}";
+        public static string ToText(this Group group) 
+        {
+            Debug.Log($"is gropp SemanticsExtensions null {group.SemanticsExtensions is null}");
+            Debug.Log($"is gropp Semantics null {group.Semantics.GetStringValue() is null}");
+
+            return $"{Sdp.AttributeIndicator}{Group.Label}" +
+            $"{group.Semantics.GetStringValue()} " +
+            $"{string.Join(" ", group.SemanticsExtensions)}" +
+            $"{Sdp.CRLF}";
+        }
+            
 
         public static MsidSemantic ToMsidSemantic(this string str)
         {

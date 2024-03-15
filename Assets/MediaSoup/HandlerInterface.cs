@@ -13,6 +13,7 @@ using Mediasoup.Ortc;
 using Mediasoup.Internal;
 using Mediasoup;
 using System.Linq;
+using System.Data;
 
 public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 {
@@ -85,7 +86,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         if (pc == null) { Debug.Log("pc is null"); }
 
-        
             pc.AddTransceiver(TrackKind.Audio);
             pc.AddTransceiver(TrackKind.Video);
 
@@ -298,27 +298,28 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         }
 
-        RtpParameters sendingRtpParameters = Utils.Clone(_sendingRtpParametersByKind[options.track.Kind.ToString()]);
+        RtpParameters sendingRtpParameters = Utils.Clone(_sendingRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
         sendingRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRtpParameters.Codecs, options.codec);
 
-        RtpParameters sendingRemoteRtpParameters = Utils.Clone(_sendingRtpParametersByKind[options.track.Kind.ToString()]);
+        RtpParameters sendingRemoteRtpParameters = Utils.Clone(_sendingRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
         sendingRemoteRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRemoteRtpParameters.Codecs, options.codec);
 
         Tuple<int, string> mediaSectionIdx = remoteSdp.GetNextMediaSectionIdx();
+        Debug.Log($"mediaSectionIdx value {mediaSectionIdx.Item2}");
 
         RTCRtpTransceiverInit transceiverInit = new RTCRtpTransceiverInit
         {
-            direction = RTCRtpTransceiverDirection.SendOnly,
-            streams = new MediaStream[0],
+            streams = new MediaStream[1],
             sendEncodings = options.GetRTCRtpTransceivers(options.encodings),
         };
 
+        transceiverInit.direction = RTCRtpTransceiverDirection.SendOnly;
         transceiverInit.streams[0] = sendStream;
 
         RTCRtpTransceiver transceiver = pc.AddTransceiver(options.track, transceiverInit);
-
+        
         RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
-
+        
         Sdp localSdp = offer.Desc.sdp.ToSdp();
 
         if (!_transportReady)
@@ -326,6 +327,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             DtlsRole localRole = DtlsRole.client;
             SetupTransport(localRole, localSdp);
         }
+
+        Debug.Log($"SetLocalDescriptionAsync");
 
         _ = await SetLocalDescriptionAsync(pc, offer.Desc);
 
@@ -369,6 +372,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             type = RTCSdpType.Answer,
             sdp = remoteSdp.GetSdp()
         };
+
+        Debug.Log(remoteSdp.GetSdp());
 
         _ = await SetRemoteDescriptionAsync(pc, sessionDescription);
 
@@ -962,7 +967,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
     IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
     {
-        RTCSessionDescriptionAsyncOperation _offer = peerConnection.CreateOffer();
+        RTCSessionDescriptionAsyncOperation _offer = pc.CreateOffer();
         yield return _offer;
     }
 
@@ -1026,8 +1031,8 @@ public class HandlerSendOptions
 {
     public MediaStreamTrack track;
     public List<RtpEncodingParameters> encodings = new List<RtpEncodingParameters>();
-    public ProducerCodecOptions codecOptions;
-    public RtpCodecCapability codec;
+    public ProducerCodecOptions codecOptions = new ProducerCodecOptions();
+    public RtpCodecCapability codec = new RtpCodecCapability();
 
     public RTCRtpEncodingParameters[] GetRTCRtpTransceivers(List<RtpEncodingParameters> rtps)
     {
@@ -1035,13 +1040,19 @@ public class HandlerSendOptions
 
         foreach (RtpEncodingParameters rtp in rtps)
         {
-            RTCRtpEncodingParameters temp = new RTCRtpEncodingParameters
-            {
-                maxBitrate = (ulong) rtp.MaxBitrate,
-                maxFramerate = (uint) rtp.MaxFramerate,
-                rid = rtp.Rid,
-                scaleResolutionDownBy = rtp.ScaleResolutionDownBy,
-            };
+            RTCRtpEncodingParameters temp = new RTCRtpEncodingParameters();
+            
+            if(rtp.MaxBitrate.HasValue)
+                temp.maxBitrate = (ulong)rtp.MaxBitrate.Value;
+            if (rtp.MaxFramerate.HasValue)
+                temp.maxFramerate = (uint)rtp.MaxFramerate.Value;
+
+                temp.rid = rtp.Rid;
+
+            if (rtp.ScaleResolutionDownBy.HasValue)
+                temp.scaleResolutionDownBy = rtp.ScaleResolutionDownBy;
+
+            rtpEncoding.Add(temp);
         }
 
         return rtpEncoding.ToArray();
