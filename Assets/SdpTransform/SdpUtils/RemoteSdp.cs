@@ -52,7 +52,7 @@ public class RemoteSdp
 
         sdpObject.Timings = new List<Timing>
         {
-            new Timing{StartTime=DateTime.MinValue,StopTime=DateTime.MinValue }
+            new Timing{StartTime=DateTimeOffset.FromUnixTimeSeconds(0).UtcDateTime,StopTime=DateTimeOffset.FromUnixTimeSeconds(0).UtcDateTime }
         };
 
 
@@ -63,6 +63,7 @@ public class RemoteSdp
         if (_iceParameters != null && _iceParameters.iceLite)
         {
             //sdpObject.Attributes.IceLiteLabel = "ice-lite";
+            sdpObject.Attributes.IceLite = true;
         }
 
         // If DTLS parameters are given, assume WebRTC and BUNDLE.
@@ -72,6 +73,7 @@ public class RemoteSdp
 
             int numFingerPrints = _dtlsParameters.fingerprints.Count;
             DtlsFingerprint stldFingerPrint = _dtlsParameters.fingerprints[numFingerPrints - 1];
+            Debug.Log(stldFingerPrint.algorithm.ToString());
             Fingerprint fingerPrint = new Fingerprint();
 
             switch (stldFingerPrint.algorithm)
@@ -104,7 +106,7 @@ public class RemoteSdp
             sdpObject.Attributes.Group = new Group 
             {
                 Semantics = GroupSemantics.Bundle,
-                SemanticsExtensions = new string[] {"audio","video"}
+                SemanticsExtensions = new string[] {"0"}
             };
 
         }

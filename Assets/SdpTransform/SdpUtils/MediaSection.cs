@@ -183,10 +183,13 @@ public class AnswerMediaSection  : MediaSection
             //this._mediaObject.type = offerMediaObject.type;
             //this._mediaObject.protocol = offerMediaObject.protocol;
 
+            //Debug.Log($"Temp media value {tempMediaDes.Proto}");
+
             if (_plainRtpParameters == null)
             {
                 _mediaObject.ConnectionData = new ConnectionData { ConnectionAddress = "127.0.0.0" };
                 _mediaObject.Port = 7;
+                _mediaObject.Proto = tempMediaDes.Proto;
             }
             else 
             {
@@ -199,6 +202,7 @@ public class AnswerMediaSection  : MediaSection
             {
                 case MediaType.Audio:
                 case MediaType.Video:
+                    _mediaObject.Attributes.RecvOnly = true;
                     _mediaObject.Direction = "recvonly";
                     _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
                     _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
@@ -436,10 +440,10 @@ public class AnswerMediaSection  : MediaSection
 
                                 foreach (var key in codecParameters.Keys)
                                 {
-                                    if (fmtp.Value != null)
+                                    /*if (fmtp.Value != null)
                                     {
                                         fmtp.Value += ";";
-                                    }
+                                    }*/
 
                                     fmtp.Value += $"{key}={codecParameters[key]}";
                                 }
@@ -448,9 +452,10 @@ public class AnswerMediaSection  : MediaSection
                                 {
                                     _mediaObject.Attributes.Fmtps.Add(fmtp);
                                 }
-
+                                Debug.Log($"Rtcpfb {codecRtcpFeedback.Count}");
                                 foreach (var fb in codecRtcpFeedback)
                                 {
+                                    Debug.Log($"Rtcpfb {fb.Parameter}");
                                     _mediaObject.Attributes.RtcpFbs.Add(
                                         new RtcpFb {PayloadType = codec.PayloadType,Type = fb.Type,SubType = fb.Parameter});
 
@@ -516,6 +521,9 @@ public class AnswerMediaSection  : MediaSection
                         {
                             Debug.Log("Implement Simulcast03"); // currently dont know what it is
                         }
+
+                        _mediaObject.Attributes.RtcpRsize = true;
+                        _mediaObject.Attributes.RtcpMux = true;
 
                         if (_planB && _mediaObject.Media == MediaType.Video) 
                         {
@@ -587,6 +595,7 @@ public class AnswerMediaSection  : MediaSection
     public override void Resume() 
     {
         _mediaObject.Direction = "recvonly";
+        _mediaObject.Attributes.RecvOnly = true;
     }
 
     public override void SetDtlsRole(DtlsRole _dtlsRole)
@@ -670,6 +679,7 @@ public class OfferMediaSection : MediaSection
         {
             case MediaKind.AUDIO:
             case MediaKind.VIDEO:
+                _mediaObject.Attributes.SendOnly = true;
                 _mediaObject.Direction = "sendonly";
                 _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
                 _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
@@ -862,6 +872,7 @@ public class OfferMediaSection : MediaSection
     public override void Resume()
     {
         _mediaObject.Direction = "sendonly";
+        _mediaObject.Attributes.SendOnly = true;
     }
 
     public override void SetDtlsRole(DtlsRole _dtlsRole)

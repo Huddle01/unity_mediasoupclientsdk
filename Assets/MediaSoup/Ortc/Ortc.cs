@@ -1153,10 +1153,6 @@ namespace Mediasoup.Ortc
             var aMimeType = aCodec.MimeType.ToLower();
             var bMimeType = bCodec.MimeType.ToLower();
 
-            UnityEngine.Debug.Log($"aMimeType {aMimeType}  bMimeType {bMimeType}");
-            UnityEngine.Debug.Log($"aCodec.ClockRate {aCodec.ClockRate}  bCodec.ClockRate {bCodec.ClockRate}");
-            UnityEngine.Debug.Log($"aCodec.Channels {aCodec.Channels}  bCodec.Channels {bCodec.Channels}");
-
             if (aMimeType != bMimeType || aCodec.ClockRate != bCodec.ClockRate || aCodec.Channels != bCodec.Channels)
             {
                 return false;
@@ -1589,6 +1585,8 @@ namespace Mediasoup.Ortc
                     remoteParameters = remoteCodec.Parameters,
                     rtcpFeedback = ReduceRtcpFeedback(matchingLocalCodec, remoteCodec),
                 };
+
+                UnityEngine.Debug.Log(extendedCodec.rtcpFeedback.Count);
 
                 extendedRtpCapabilities.codecs.Add(extendedCodec);
             }

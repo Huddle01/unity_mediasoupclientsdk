@@ -91,7 +91,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
             RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
 
-            Debug.Log(offer.Desc.sdp);
+            Debug.Log($"offer.Desc.sdp {offer.Desc.sdp}");
 
             try
             {
@@ -301,7 +301,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         RtpParameters sendingRtpParameters = Utils.Clone(_sendingRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
         sendingRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRtpParameters.Codecs, options.codec);
 
-        RtpParameters sendingRemoteRtpParameters = Utils.Clone(_sendingRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
+        RtpParameters sendingRemoteRtpParameters = Utils.Clone(_sendingRemoteRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
         sendingRemoteRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRemoteRtpParameters.Codecs, options.codec);
 
         Tuple<int, string> mediaSectionIdx = remoteSdp.GetNextMediaSectionIdx();
@@ -365,17 +365,29 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             sendingRtpParameters.Encodings = options.encodings;
         }
 
+        foreach (var codec in sendingRemoteRtpParameters.Codecs)
+        {
+            Debug.Log($"codec.RtcpFeedback length {codec.RtcpFeedback.Count} ");
+            foreach (var fb in codec.RtcpFeedback)
+            {
+                Debug.Log($"fb.Type {fb.Type}");
+            }
+        }
+
         remoteSdp.Send(offerMediaObject, mediaSectionIdx.Item2, sendingRtpParameters, sendingRemoteRtpParameters, options.codecOptions, true);
 
         RTCSessionDescription sessionDescription = new RTCSessionDescription
         {
             type = RTCSdpType.Answer,
-            sdp = remoteSdp.GetSdp()
+            sdp = System.IO.File.ReadAllText(Application.streamingAssetsPath + "/DummySdp.txt")
         };
 
         Debug.Log(remoteSdp.GetSdp());
 
         _ = await SetRemoteDescriptionAsync(pc, sessionDescription);
+        
+        
+        
 
         // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
@@ -996,6 +1008,12 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     IEnumerator SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
     {
         RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetRemoteDescription(ref sessionDescription);
+
+        if (localDesc.IsError) 
+        {
+            Debug.Log(localDesc.Error.errorType.ToString());
+        }
+
         yield return localDesc;
     }
 

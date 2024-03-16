@@ -693,10 +693,6 @@ namespace Utilme.SdpTransform
 
         public static string ToText(this MediaDescription mediaDescription) 
         {
-            Debug.Log($"Media Des Check {mediaDescription is null}");
-            Debug.Log($"Media Des Check {mediaDescription.Port}");
-            Debug.Log($"Media Des Check {mediaDescription.Proto}");
-            Debug.Log($"Media Des Check {mediaDescription.Fmts is null}");
             return $"{Sdp.MediaDescriptionIndicator}" +
                     $"{mediaDescription.Media.GetStringValue()} {mediaDescription.Port} {mediaDescription.Proto} " +
                     $"{string.Join(" ", mediaDescription.Fmts.ToArray())}" +
@@ -724,9 +720,6 @@ namespace Utilme.SdpTransform
 
         public static string ToText(this Group group) 
         {
-            Debug.Log($"is gropp SemanticsExtensions null {group.SemanticsExtensions is null}");
-            Debug.Log($"is gropp Semantics null {group.Semantics.GetStringValue() is null}");
-
             return $"{Sdp.AttributeIndicator}{Group.Label}" +
             $"{group.Semantics.GetStringValue()} " +
             $"{string.Join(" ", group.SemanticsExtensions)}" +
@@ -749,7 +742,7 @@ namespace Utilme.SdpTransform
 
         public static string ToText(this MsidSemantic msidSemantic) =>
             $"{Sdp.AttributeIndicator}{MsidSemantic.Label}" +
-                $"{msidSemantic.Token} " +
+                $"{msidSemantic.WebRtcMediaStreamToken} " +
                 $"{(msidSemantic.IdList is not null ? string.Join(" ", msidSemantic.IdList) : string.Empty)}" +
                 $"{Sdp.CRLF}";
 
@@ -970,6 +963,7 @@ namespace Utilme.SdpTransform
                 $"{candidate.Foundation} {candidate.ComponentId} {candidate.Transport.GetStringValue()} " +
                 $"{candidate.Priority} {candidate.ConnectionAddress} {candidate.Port} {Candidate.Typ} " +
                 $"{candidate.Type.GetStringValue()}" +
+                $"{(!string.IsNullOrEmpty(candidate.TCPType) ? $" tcptype {candidate.TCPType}" : string.Empty)}"+
                 $"{(candidate.RelAddr is not null ? $" {Candidate.Raddr} {candidate.RelAddr}" : string.Empty)}" +
                 $"{(candidate.RelPort.HasValue ? $" {Candidate.Rport} {candidate.RelPort}" : string.Empty)}" +
                 $"{(candidate.Extensions is null ? string.Empty : string.Join("", candidate.Extensions.Select(pair => " " + pair.Item1 + " " + pair.Item2).ToArray()))}" +

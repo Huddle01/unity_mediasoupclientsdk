@@ -49,7 +49,8 @@ public class CommonUtils
                     Kind = mediaKind,
                     MimeType = $"{mediaType.ToString().ToLower()}/{rtp.EncodingName}",
                     ClockRate = rtp.ClockRate,
-                    PreferredPayloadType = rtp.PayloadType
+                    PreferredPayloadType = rtp.PayloadType,
+                    RtcpFeedback = new List<RtcpFeedback>(),
                 };
 
                 if (rtp.Channels != null) codecCap.Channels = rtp.Channels.Value;
@@ -90,17 +91,27 @@ public class CommonUtils
                 RtcpFeedback feedback = new RtcpFeedback
                 {
                     Parameter = fb.SubType,
-                    Type = fb.Type
+                    Type = fb.PayloadType.ToString()
                 };
 
-                if (codecsMap.ContainsKey(fb.PayloadType))
+                if (string.IsNullOrEmpty(feedback.Parameter))
                 {
-                    if (codecsMap[fb.PayloadType] != null)
+                    feedback.Parameter = null;
+                }
+
+                // rtcp-fb payload is not '*', so just apply it to its corresponding
+                // codec.
+                if (fb.Type != "*")
+                {
+                    byte fbType = (byte)int.Parse(fb.PayloadType.ToString());
+                   
+                    RtpCodecCapability codec = codecsMap[fbType];
+                    if (codec == null)
                     {
                         continue;
                     }
 
-                    codecsMap[fb.PayloadType].RtcpFeedback.Add(feedback);
+                    codec.RtcpFeedback.Add(feedback);
                 }
             }
 
