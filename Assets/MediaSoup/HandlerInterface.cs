@@ -14,6 +14,15 @@ using Mediasoup.Internal;
 using Mediasoup;
 using System.Linq;
 using System.Data;
+using Newtonsoft.Json;
+using static System.Net.WebRequestMethods;
+using static UnityEngine.Rendering.VirtualTexturing.Debugging;
+using System.Drawing;
+using System.IO;
+using System.Security.Cryptography;
+using System.Security.Policy;
+using Unity.VisualScripting;
+using UnityEditor.PackageManager;
 
 public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 {
@@ -319,7 +328,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         RTCRtpTransceiver transceiver = pc.AddTransceiver(options.track, transceiverInit);
         
         RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
-        
+                
         Sdp localSdp = offer.Desc.sdp.ToSdp();
 
         if (!_transportReady)
@@ -364,20 +373,19 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         {
             sendingRtpParameters.Encodings = options.encodings;
         }
-
         remoteSdp.Send(offerMediaObject, mediaSectionIdx.Item2, sendingRtpParameters, sendingRemoteRtpParameters, options.codecOptions, true);
-
         RTCSessionDescription sessionDescription = new RTCSessionDescription
         {
             type = RTCSdpType.Answer,
-            sdp = remoteSdp.GetSdp()
+            sdp = "v=0\r\no=mediasoup-client 10000 1 IN IP4 0.0.0.0\r\ns=-\r\nt=0 0\r\na=ice-lite\r\na=fingerprint:sha-224 32:B1:E8:08:ED:32:8A:F2:E7:93:19:49:79:C9:62:84:8F:9A:A4:52:49:89:C8:D5:C5:46:B9:0B\r\na=msid-semantic: WMS *\r\na=group:BUNDLE 0\r\nm=video 7 UDP/TLS/RTP/SAVPF 96 97\r\nc=IN IP4 127.0.0.1\r\na=rtpmap:96 VP8/90000\r\na=rtpmap:97 rtx/90000\r\na=fmtp:96 x-google-start-bitrate=1000\r\na=fmtp:97 apt=96\r\na=rtcp-fb:96 transport-cc \r\na=rtcp-fb:96 ccm fir\r\na=rtcp-fb:96 nack \r\na=rtcp-fb:96 nack pli\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id\r\na=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\r\na=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\na=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01\r\na=extmap:13 urn:3gpp:video-orientation\r\na=extmap:14 urn:ietf:params:rtp-hdrext:toffset\r\na=setup:passive\r\na=mid:0\r\na=recvonly\r\na=ice-ufrag:c318rhq8a4f81m5lhke5gmf5b9wdmf2m\r\na=ice-pwd:qd36x7ke8i5ebgvn3qsvag5n1fyfgx04\r\na=candidate:udpcandidate 1 udp 1076302079 127.0.0.1 2007 typ host\r\na=candidate:tcpcandidate 1 tcp 1076276479 127.0.0.1 2015 typ host tcptype passive\r\na=end-of-candidates\r\na=ice-options:renomination\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rid:r0 recv\r\na=rid:r1 recv\r\na=rid:r2 recv\r\na=simulcast:recv r0;r1;r2\r\n"
         };
+    Debug.Log(remoteSdp.GetSdp());
 
-        Debug.Log(remoteSdp.GetSdp());
+        Debug.Log($"Session Description: {sessionDescription.sdp}");
 
         _ = await SetRemoteDescriptionAsync(pc, sessionDescription);
 
-        // Store in the map.
+    // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
 
         HandlerSendResult result = new HandlerSendResult
@@ -389,627 +397,476 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         return result;
     }
-
-    public virtual async void StopSending(string localId)
+public virtual async void StopSending(string localId)
+{
+    if (isClosed) return;
+    RTCRtpTransceiver transceiver = null;
+    bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
+    if (!isTransreceiverExist)
     {
-        if (isClosed) return;
-
-        RTCRtpTransceiver transceiver = null;
-        bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
-
-        if (!isTransreceiverExist)
-        {
-            throw new Exception("associated RTCRtpTransceiver not found");
-        }
-
-        transceiver.Sender.ReplaceTrack(null);
-        pc.RemoveTrack(transceiver.Sender);
-
-
-        bool mediaSectionClosed = remoteSdp.CloseMediaSection(transceiver.Mid);
-
-        if (mediaSectionClosed)
-        {
-            transceiver.Stop();
-        }
-
-        RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
-
-        _ = await SetLocalDescriptionAsync(pc, offer.Desc);
-
-        RTCSessionDescription answer = new RTCSessionDescription
-        {
-            type = RTCSdpType.Answer,
-            sdp = remoteSdp.GetSdp()
-        };
-
-        _ = await SetRemoteDescriptionAsync(pc, answer);
-
-        _mapMidTransceiver.Remove(localId);
+        throw new Exception("associated RTCRtpTransceiver not found");
     }
-
-    public virtual async void PauseSending(string localId)
+    transceiver.Sender.ReplaceTrack(null);
+    pc.RemoveTrack(transceiver.Sender);
+    bool mediaSectionClosed = remoteSdp.CloseMediaSection(transceiver.Mid);
+    if (mediaSectionClosed)
     {
-        RTCRtpTransceiver transceiver = null;
-        bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
-
-        if (!isTransreceiverExist)
-        {
-            throw new Exception("associated RTCRtpTransceiver not found");
-        }
-
-        transceiver.Direction = RTCRtpTransceiverDirection.Inactive;
-        remoteSdp.PauseMediaSection(localId);
-
-        RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
-
-        _ = await SetLocalDescriptionAsync(pc, offer.Desc);
-
-        RTCSessionDescription answer = new RTCSessionDescription
-        {
-            type = RTCSdpType.Answer,
-            sdp = remoteSdp.GetSdp()
-        };
-
-        _ = await SetRemoteDescriptionAsync(pc, answer);
-
+        transceiver.Stop();
     }
-
-    public virtual async void ResumeSending(string localId)
+    RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
+    _ = await SetLocalDescriptionAsync(pc, offer.Desc);
+    RTCSessionDescription answer = new RTCSessionDescription
     {
-        RTCRtpTransceiver transceiver = null;
-        bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
-
-        if (!isTransreceiverExist)
-        {
-            throw new Exception("associated RTCRtpTransceiver not found");
-        }
-
-        transceiver.Direction = RTCRtpTransceiverDirection.SendOnly;
-
-        RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
-
-        _ = await SetLocalDescriptionAsync(pc, offer.Desc);
-
-        RTCSessionDescription answer = new RTCSessionDescription
-        {
-            type = RTCSdpType.Answer,
-            sdp = remoteSdp.GetSdp()
-        };
-
-        _ = await SetRemoteDescriptionAsync(pc, answer);
-
+        type = RTCSdpType.Answer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, answer);
+    _mapMidTransceiver.Remove(localId);
+}
+public virtual async void PauseSending(string localId)
+{
+    RTCRtpTransceiver transceiver = null;
+    bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
+    if (!isTransreceiverExist)
+    {
+        throw new Exception("associated RTCRtpTransceiver not found");
     }
-
-    public virtual void ReplaceTrack(string localId, MediaStreamTrack track)
+    transceiver.Direction = RTCRtpTransceiverDirection.Inactive;
+    remoteSdp.PauseMediaSection(localId);
+    RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
+    _ = await SetLocalDescriptionAsync(pc, offer.Desc);
+    RTCSessionDescription answer = new RTCSessionDescription
     {
-        if (track != null)
+        type = RTCSdpType.Answer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, answer);
+}
+public virtual async void ResumeSending(string localId)
+{
+    RTCRtpTransceiver transceiver = null;
+    bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
+    if (!isTransreceiverExist)
+    {
+        throw new Exception("associated RTCRtpTransceiver not found");
+    }
+    transceiver.Direction = RTCRtpTransceiverDirection.SendOnly;
+    RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
+    _ = await SetLocalDescriptionAsync(pc, offer.Desc);
+    RTCSessionDescription answer = new RTCSessionDescription
+    {
+        type = RTCSdpType.Answer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, answer);
+}
+public virtual void ReplaceTrack(string localId, MediaStreamTrack track)
+{
+    if (track != null)
+    {
+        Debug.Log($"ReplcaTrack() [localId {localId}, trackId {track.Id}]");
+    }
+    else
+    {
+        Debug.Log($"ReplcaTrack() [localId {localId}, no trackId]");
+    }
+    RTCRtpTransceiver transceiver = null;
+    bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
+    if (!isTransreceiverExist)
+    {
+        throw new Exception("associated RTCRtpTransceiver not found");
+    }
+    _ = transceiver.Sender.ReplaceTrack(track);
+}
+public virtual async void SetMaxSpatialLayer(string localId, int spatialLayer)
+{
+    RTCRtpTransceiver transceiver = null;
+    bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
+    if (!isTransreceiverExist)
+    {
+        throw new Exception("associated RTCRtpTransceiver not found");
+    }
+    RTCRtpSendParameters parameters = transceiver.Sender.GetParameters();
+    for (int idx = 0; idx < parameters.encodings.Length; idx++)
+    {
+        var encoding = parameters.encodings[idx];
+        if (idx <= spatialLayer)
         {
-            Debug.Log($"ReplcaTrack() [localId {localId}, trackId {track.Id}]");
+            encoding.active = true;
         }
         else
         {
-            Debug.Log($"ReplcaTrack() [localId {localId}, no trackId]");
+            encoding.active = false;
         }
-
-        RTCRtpTransceiver transceiver = null;
-        bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
-
-        if (!isTransreceiverExist)
-        {
-            throw new Exception("associated RTCRtpTransceiver not found");
-        }
-
-        _ = transceiver.Sender.ReplaceTrack(track);
-
     }
-
-    public virtual async void SetMaxSpatialLayer(string localId, int spatialLayer)
+    RTCError error = transceiver.Sender.SetParameters(parameters);
+    remoteSdp.MuxMediaSectionSimulcast(localId, parameters.encodings.ToList());
+    RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
+    _ = await SetLocalDescriptionAsync(pc, offer.Desc);
+    RTCSessionDescription answer = new RTCSessionDescription
     {
-        RTCRtpTransceiver transceiver = null;
-        bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
-
-        if (!isTransreceiverExist)
+        type = RTCSdpType.Answer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, answer);
+}
+public virtual async void SetRtpEncodingParameters(string localId, RtpEncodingParameters param)
+{
+    RTCRtpTransceiver transceiver = null;
+    bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
+    if (!isTransreceiverExist)
+    {
+        throw new Exception("associated RTCRtpTransceiver not found");
+    }
+    RTCRtpSendParameters parameters = transceiver.Sender.GetParameters();
+    for (int idx = 0; idx < parameters.encodings.Length; idx++)
+    {
+        parameters.encodings[idx] = new RTCRtpEncodingParameters
         {
-            throw new Exception("associated RTCRtpTransceiver not found");
-        }
-
-        RTCRtpSendParameters parameters = transceiver.Sender.GetParameters();
-
-        for (int idx = 0; idx < parameters.encodings.Length; idx++)
-        {
-            var encoding = parameters.encodings[idx];
-
-            if (idx <= spatialLayer)
-            {
-                encoding.active = true;
-            }
-            else
-            {
-                encoding.active = false;
-            }
-        }
-
-        RTCError error = transceiver.Sender.SetParameters(parameters);
-
-        remoteSdp.MuxMediaSectionSimulcast(localId, parameters.encodings.ToList());
-
-        RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
-
-        _ = await SetLocalDescriptionAsync(pc, offer.Desc);
-
-        RTCSessionDescription answer = new RTCSessionDescription
-        {
-            type = RTCSdpType.Answer,
-            sdp = remoteSdp.GetSdp()
+            maxBitrate = param.MaxBitrate,
+            maxFramerate = param.MaxFramerate,
+            rid = param.Rid,
+            scaleResolutionDownBy = param.ScaleResolutionDownBy
         };
-
-        _ = await SetRemoteDescriptionAsync(pc, answer);
     }
-
-    public virtual async void SetRtpEncodingParameters(string localId, RtpEncodingParameters param)
+    transceiver.Sender.SetParameters(parameters);
+    remoteSdp.MuxMediaSectionSimulcast(localId, parameters.encodings.ToList());
+    RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
+    _ = await SetLocalDescriptionAsync(pc, offer.Desc);
+    RTCSessionDescription answer = new RTCSessionDescription
     {
-        RTCRtpTransceiver transceiver = null;
-        bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
-
-        if (!isTransreceiverExist)
-        {
-            throw new Exception("associated RTCRtpTransceiver not found");
-        }
-
-        RTCRtpSendParameters parameters = transceiver.Sender.GetParameters();
-
-        for (int idx = 0; idx < parameters.encodings.Length; idx++)
-        {
-            parameters.encodings[idx] = new RTCRtpEncodingParameters
-            {
-                maxBitrate = param.MaxBitrate,
-                maxFramerate = param.MaxFramerate,
-                rid = param.Rid,
-                scaleResolutionDownBy = param.ScaleResolutionDownBy
-            };
-        }
-
-        transceiver.Sender.SetParameters(parameters);
-        remoteSdp.MuxMediaSectionSimulcast(localId, parameters.encodings.ToList());
-
-        RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
-
-        _ = await SetLocalDescriptionAsync(pc, offer.Desc);
-
-        RTCSessionDescription answer = new RTCSessionDescription
-        {
-            type = RTCSdpType.Answer,
-            sdp = remoteSdp.GetSdp()
-        };
-
-        _ = await SetRemoteDescriptionAsync(pc, answer);
+        type = RTCSdpType.Answer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, answer);
+}
+public virtual async Task<RTCStatsReport> GetSenderStats(string localId)
+{
+    RTCRtpTransceiver transceiver = null;
+    bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
+    if (!isTransreceiverExist)
+    {
+        throw new Exception("associated RTCRtpTransceiver not found");
     }
-
-    public virtual async Task<RTCStatsReport> GetSenderStats(string localId)
+    RTCStatsReportAsyncOperation statsOp = await GetTransreceiverStats(transceiver);
+    return statsOp.Value;
+}
+public virtual async Task<HandlerSendDataChannelResult> SendDataChannel(HandlerSendDataChannelOptions options)
+{
+    RTCDataChannelInit channelInit = new RTCDataChannelInit
     {
-        RTCRtpTransceiver transceiver = null;
-        bool isTransreceiverExist = _mapMidTransceiver.TryGetValue(localId, out transceiver);
+        negotiated = true,
+        id = _nextSendSctpStreamId,
+    };
+    RTCDataChannel dataChannel = pc.CreateDataChannel(options.label, channelInit);
 
-        if (!isTransreceiverExist)
-        {
-            throw new Exception("associated RTCRtpTransceiver not found");
-        }
-
-        RTCStatsReportAsyncOperation statsOp = await GetTransreceiverStats(transceiver);
-        return statsOp.Value;
-    }
-
-    public virtual async Task<HandlerSendDataChannelResult> SendDataChannel(HandlerSendDataChannelOptions options)
-    {
-        RTCDataChannelInit channelInit = new RTCDataChannelInit
-        {
-            negotiated = true,
-            id = _nextSendSctpStreamId,
-        };
-
-        RTCDataChannel dataChannel = pc.CreateDataChannel(options.label, channelInit);
-
-        // Increase next id.
+    // Increase next id.
         _nextSendSctpStreamId = ++_nextSendSctpStreamId % SctpNumStreams.MIS;
 
-        // If this is the first DataChannel we need to create the SDP answer with
-        // m=application section.
+    // If this is the first DataChannel we need to create the SDP answer with
+    // m=application section.
 
         if (_hasDataChannelMediaSection)
-        {
-            RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
-            Sdp localSdpObject = offer.Desc.sdp.ToSdp();
-
-            MediaDescription offerMediaObject = localSdpObject.MediaDescriptions.FirstOrDefault(x => x.Media == MediaType.Application);
-
-            if (!_transportReady)
-            {
-                SetupTransport(DtlsRole.client, localSdpObject);
-            }
-
-            _ = await SetLocalDescriptionAsync(pc, offer.Desc);
-
-            remoteSdp.SendSctpAssociation(offerMediaObject);
-
-            RTCSessionDescription answer = new RTCSessionDescription
-            {
-                type = RTCSdpType.Answer,
-                sdp = remoteSdp.GetSdp()
-            };
-
-            _ = await SetRemoteDescriptionAsync(pc, answer);
-            _hasDataChannelMediaSection = true;
-
-        }
-
-        SctpStreamParameters sctpStreamParameters = new SctpStreamParameters
-        {
-            streamId = options.streamId,
-            ordered = options.ordered,
-            maxPacketLifeTime = options.maxPacketLifeTime,
-            maxRetransmits = options.maxRetransmits
-        };
-
-        return new HandlerSendDataChannelResult
-        {
-            dataChannel = dataChannel,
-            sctpStreamParameters = sctpStreamParameters
-        };
-
-    }
-
-    public virtual async Task<List<HandlerReceiveResult>> Receive(List<HandlerReceiveOptions> optionsList)
     {
-        List<HandlerReceiveResult> results = new List<HandlerReceiveResult>();
-        Dictionary<string, string> mapLocalId = new Dictionary<string, string>();
-
-        foreach (HandlerReceiveOptions options in optionsList)
-        {
-            var trackId = options.trackId;
-            var kind = options.kind;
-            var rtpParameters = options.rtpParameters;
-            var streamId = options.streamId;
-
-            Debug.Log($"receive() [trackId:{trackId}, kind:{kind}]");
-
-            var localId = rtpParameters.Mid ?? this._mapMidTransceiver.Count.ToString();
-
-            mapLocalId.Add(trackId, localId);
-
-            MediaKind mediaKind = MediaKind.AUDIO;
-
-            if (kind.Contains("vi"))
-            {
-                mediaKind = MediaKind.VIDEO;
-            }
-            else if (kind.Contains("app"))
-            {
-                mediaKind = MediaKind.APPLICATION;
-            }
-
-            remoteSdp.Receive(localId, mediaKind, rtpParameters,
-                streamId ?? rtpParameters.Rtcp.CNAME ?? string.Empty,
-                trackId
-            );
-        }
-
-        RTCSessionDescription offer = new RTCSessionDescription
-        {
-            type = RTCSdpType.Offer,
-            sdp = remoteSdp.GetSdp()
-        };
-
-        _ = await SetRemoteDescriptionAsync(pc, offer);
-
-        RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
-
-        Sdp localSdpObject = answer.Desc.sdp.ToSdp();
-
-        foreach (HandlerReceiveOptions options in optionsList)
-        {
-            var trackId = options.trackId;
-            var rtpParameters = options.rtpParameters;
-            var localId = mapLocalId[trackId];
-
-            MediaDescription answerMediaObject = localSdpObject.MediaDescriptions.FirstOrDefault
-                (
-                    x => x.Attributes.Mid.Id == localId
-                );
-
-            // May need to modify codec parameters in the answer based on codec
-            // parameters in the offer.
-
-            CommonUtils.ApplyCodecParameters(rtpParameters, answerMediaObject);
-        }
-
-        RTCSessionDescription answerDes = new RTCSessionDescription
-        {
-            type = RTCSdpType.Answer,
-            sdp = localSdpObject.ToText()
-        };
-
-
+        RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
+        Sdp localSdpObject = offer.Desc.sdp.ToSdp();
+        MediaDescription offerMediaObject = localSdpObject.MediaDescriptions.FirstOrDefault(x => x.Media == MediaType.Application);
         if (!_transportReady)
         {
             SetupTransport(DtlsRole.client, localSdpObject);
         }
-
-        _ = await SetLocalDescriptionAsync(pc, answerDes);
-
-
-        foreach (HandlerReceiveOptions options in optionsList)
+        _ = await SetLocalDescriptionAsync(pc, offer.Desc);
+        remoteSdp.SendSctpAssociation(offerMediaObject);
+        RTCSessionDescription answer = new RTCSessionDescription
         {
-            var trackId = options.trackId;
-            var localId = mapLocalId[trackId];
-
-            RTCRtpTransceiver transceiver = pc.GetTransceivers().FirstOrDefault(t => t.Mid == localId);
-
-            if (transceiver == null)
-            {
-                throw new Exception("new RTCRtpTransceiver not found");
-            }
-            else
-            {
-                _mapMidTransceiver.Add(localId, transceiver);
-                results.Add(new HandlerReceiveResult
-                {
-                    localId = localId,
-                    track = transceiver.Receiver.Track,
-                    rtpReceiver = transceiver.Receiver
-                });
-            }
-        }
-
-        return results;
-
-    }
-
-    public virtual async Task StopReceiving(List<string> localIds)
-    {
-        if (isClosed) return;
-
-        foreach (string localId in localIds)
-        {
-            RTCRtpTransceiver transceiver = _mapMidTransceiver[localId];
-
-            if (transceiver == null)
-            {
-                throw new Exception("associated RTCRtpTransceiver not found");
-            }
-
-            remoteSdp.CloseMediaSection(transceiver.Mid);
-        }
-
-        RTCSessionDescription offerDesc = new RTCSessionDescription
-        {
-            type = RTCSdpType.Offer,
+            type = RTCSdpType.Answer,
             sdp = remoteSdp.GetSdp()
         };
-
-        _ = await SetRemoteDescriptionAsync(pc, offerDesc);
-
-        RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
-
-        _ = await SetLocalDescriptionAsync(pc, answer.Desc);
-
-        foreach (string localId in localIds)
-        {
-            _mapMidTransceiver.Remove(localId);
-        }
+        _ = await SetRemoteDescriptionAsync(pc, answer);
+        _hasDataChannelMediaSection = true;
     }
-
-    public virtual async void PauseReceiving(List<string> localIds)
+    SctpStreamParameters sctpStreamParameters = new SctpStreamParameters
     {
-        foreach (string localId in localIds)
-        {
-            RTCRtpTransceiver transceiver = _mapMidTransceiver[localId];
-
-            if (transceiver == null)
-            {
-                throw new Exception("associated RTCRtpTransceiver not found");
-            }
-
-            transceiver.Direction = RTCRtpTransceiverDirection.Inactive;
-
-            remoteSdp.PauseMediaSection(transceiver.Mid);
-        }
-
-        RTCSessionDescription offerDesc = new RTCSessionDescription
-        {
-            type = RTCSdpType.Offer,
-            sdp = remoteSdp.GetSdp()
-        };
-
-        _ = await SetRemoteDescriptionAsync(pc, offerDesc);
-
-        RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
-
-        _ = await SetLocalDescriptionAsync(pc, answer.Desc);
-    }
-
-    public virtual async Task ResumeReceiving(List<string> localIds)
+        streamId = options.streamId,
+        ordered = options.ordered,
+        maxPacketLifeTime = options.maxPacketLifeTime,
+        maxRetransmits = options.maxRetransmits
+    };
+    return new HandlerSendDataChannelResult
     {
-        foreach (string localId in localIds)
+        dataChannel = dataChannel,
+        sctpStreamParameters = sctpStreamParameters
+    };
+}
+public virtual async Task<List<HandlerReceiveResult>> Receive(List<HandlerReceiveOptions> optionsList)
+{
+    List<HandlerReceiveResult> results = new List<HandlerReceiveResult>();
+    Dictionary<string, string> mapLocalId = new Dictionary<string, string>();
+    foreach (HandlerReceiveOptions options in optionsList)
+    {
+        var trackId = options.trackId;
+        var kind = options.kind;
+        var rtpParameters = options.rtpParameters;
+        var streamId = options.streamId;
+        Debug.Log($"receive() [trackId:{trackId}, kind:{kind}]");
+        var localId = rtpParameters.Mid ?? this._mapMidTransceiver.Count.ToString();
+        mapLocalId.Add(trackId, localId);
+        MediaKind mediaKind = MediaKind.AUDIO;
+        if (kind.Contains("vi"))
         {
-            RTCRtpTransceiver transceiver = _mapMidTransceiver[localId];
-
-            if (transceiver == null)
-            {
-                throw new Exception("associated RTCRtpTransceiver not found");
-            }
-
-            transceiver.Direction = RTCRtpTransceiverDirection.RecvOnly;
-
-            remoteSdp.ResumeReceivingMediaSection(transceiver.Mid);
+            mediaKind = MediaKind.VIDEO;
         }
-
-        RTCSessionDescription offerDesc = new RTCSessionDescription
+        else if (kind.Contains("app"))
         {
-            type = RTCSdpType.Offer,
-            sdp = remoteSdp.GetSdp()
-        };
-
-        _ = await SetRemoteDescriptionAsync(pc, offerDesc);
-
-        RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
-
-        _ = await SetLocalDescriptionAsync(pc, answer.Desc);
+            mediaKind = MediaKind.APPLICATION;
+        }
+        remoteSdp.Receive(localId, mediaKind, rtpParameters,
+        streamId ?? rtpParameters.Rtcp.CNAME ?? string.Empty,
+        trackId
+        );
     }
+    RTCSessionDescription offer = new RTCSessionDescription
+    {
+        type = RTCSdpType.Offer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, offer);
+    RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
+    Sdp localSdpObject = answer.Desc.sdp.ToSdp();
+    foreach (HandlerReceiveOptions options in optionsList)
+    {
+        var trackId = options.trackId;
+        var rtpParameters = options.rtpParameters;
+        var localId = mapLocalId[trackId];
+        MediaDescription answerMediaObject = localSdpObject.MediaDescriptions.FirstOrDefault
+        (
+        x => x.Attributes.Mid.Id == localId
+        );
 
-    public virtual async Task<RTCStatsReport> GetReceiverStats(string localId)
+        // May need to modify codec parameters in the answer based on codec
+        // parameters in the offer.
+
+            CommonUtils.ApplyCodecParameters(rtpParameters, answerMediaObject);
+    }
+    RTCSessionDescription answerDes = new RTCSessionDescription
+    {
+        type = RTCSdpType.Answer,
+        sdp = localSdpObject.ToText()
+    };
+    if (!_transportReady)
+    {
+        SetupTransport(DtlsRole.client, localSdpObject);
+    }
+    _ = await SetLocalDescriptionAsync(pc, answerDes);
+    foreach (HandlerReceiveOptions options in optionsList)
+    {
+        var trackId = options.trackId;
+        var localId = mapLocalId[trackId];
+        RTCRtpTransceiver transceiver = pc.GetTransceivers().FirstOrDefault(t => t.Mid == localId);
+        if (transceiver == null)
+        {
+            throw new Exception("new RTCRtpTransceiver not found");
+        }
+        else
+        {
+            _mapMidTransceiver.Add(localId, transceiver);
+            results.Add(new HandlerReceiveResult
+            {
+                localId = localId,
+                track = transceiver.Receiver.Track,
+                rtpReceiver = transceiver.Receiver
+            });
+        }
+    }
+    return results;
+}
+public virtual async Task StopReceiving(List<string> localIds)
+{
+    if (isClosed) return;
+    foreach (string localId in localIds)
     {
         RTCRtpTransceiver transceiver = _mapMidTransceiver[localId];
-
         if (transceiver == null)
         {
             throw new Exception("associated RTCRtpTransceiver not found");
         }
-
-        RTCStatsReportAsyncOperation statsReport = await GetTransreceiverStats(transceiver);
-        return statsReport.Value;
+        remoteSdp.CloseMediaSection(transceiver.Mid);
     }
-
-    public virtual async Task<RTCDataChannel> ReceiveDataChannel(HandlerReceiveDataChannelOptions options)
+    RTCSessionDescription offerDesc = new RTCSessionDescription
     {
-
-        var sctpStreamParameters = options.sctpStreamParameters;
-        var label = options.label;
-        var protocol = options.protocol;
-
-        var streamId = sctpStreamParameters.streamId;
-        var ordered = sctpStreamParameters.ordered;
-        var maxPacketLifeTime = sctpStreamParameters.maxPacketLifeTime;
-        var maxRetransmits = sctpStreamParameters.maxRetransmits;
-
-        RTCDataChannelInit channelInit = new RTCDataChannelInit
+        type = RTCSdpType.Offer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, offerDesc);
+    RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
+    _ = await SetLocalDescriptionAsync(pc, answer.Desc);
+    foreach (string localId in localIds)
+    {
+        _mapMidTransceiver.Remove(localId);
+    }
+}
+public virtual async void PauseReceiving(List<string> localIds)
+{
+    foreach (string localId in localIds)
+    {
+        RTCRtpTransceiver transceiver = _mapMidTransceiver[localId];
+        if (transceiver == null)
         {
-            negotiated = true,
-            id = streamId,
-        };
+            throw new Exception("associated RTCRtpTransceiver not found");
+        }
+        transceiver.Direction = RTCRtpTransceiverDirection.Inactive;
+        remoteSdp.PauseMediaSection(transceiver.Mid);
+    }
+    RTCSessionDescription offerDesc = new RTCSessionDescription
+    {
+        type = RTCSdpType.Offer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, offerDesc);
+    RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
+    _ = await SetLocalDescriptionAsync(pc, answer.Desc);
+}
+public virtual async Task ResumeReceiving(List<string> localIds)
+{
+    foreach (string localId in localIds)
+    {
+        RTCRtpTransceiver transceiver = _mapMidTransceiver[localId];
+        if (transceiver == null)
+        {
+            throw new Exception("associated RTCRtpTransceiver not found");
+        }
+        transceiver.Direction = RTCRtpTransceiverDirection.RecvOnly;
+        remoteSdp.ResumeReceivingMediaSection(transceiver.Mid);
+    }
+    RTCSessionDescription offerDesc = new RTCSessionDescription
+    {
+        type = RTCSdpType.Offer,
+        sdp = remoteSdp.GetSdp()
+    };
+    _ = await SetRemoteDescriptionAsync(pc, offerDesc);
+    RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
+    _ = await SetLocalDescriptionAsync(pc, answer.Desc);
+}
+public virtual async Task<RTCStatsReport> GetReceiverStats(string localId)
+{
+    RTCRtpTransceiver transceiver = _mapMidTransceiver[localId];
+    if (transceiver == null)
+    {
+        throw new Exception("associated RTCRtpTransceiver not found");
+    }
+    RTCStatsReportAsyncOperation statsReport = await GetTransreceiverStats(transceiver);
+    return statsReport.Value;
+}
+public virtual async Task<RTCDataChannel> ReceiveDataChannel(HandlerReceiveDataChannelOptions options)
+{
+    var sctpStreamParameters = options.sctpStreamParameters;
+    var label = options.label;
+    var protocol = options.protocol;
+    var streamId = sctpStreamParameters.streamId;
+    var ordered = sctpStreamParameters.ordered;
+    var maxPacketLifeTime = sctpStreamParameters.maxPacketLifeTime;
+    var maxRetransmits = sctpStreamParameters.maxRetransmits;
+    RTCDataChannelInit channelInit = new RTCDataChannelInit
+    {
+        negotiated = true,
+        id = streamId,
+    };
+    RTCDataChannel dataChannel = pc.CreateDataChannel(options.label, channelInit);
 
-        RTCDataChannel dataChannel = pc.CreateDataChannel(options.label, channelInit);
-
-        // If this is the first DataChannel we need to create the SDP offer with
-        // m=application section.
+    // If this is the first DataChannel we need to create the SDP offer with
+    // m=application section.
         if (_hasDataChannelMediaSection)
+    {
+        remoteSdp.ReceiveSctpAssociation(false);
+        RTCSessionDescription offerDesc = new RTCSessionDescription
         {
-            remoteSdp.ReceiveSctpAssociation(false);
-
-            RTCSessionDescription offerDesc = new RTCSessionDescription
-            {
-                type = RTCSdpType.Offer,
-                sdp = remoteSdp.GetSdp()
-            };
-
-            _ = await SetRemoteDescriptionAsync(pc, offerDesc);
-
-            RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
-
-            if (!_transportReady)
-            {
-                Sdp localSdpObject = answer.Desc.sdp.ToSdp();
-                SetupTransport(DtlsRole.client, localSdpObject);
-            }
-
-
-            _ = await SetLocalDescriptionAsync(pc, answer.Desc);
-            _hasDataChannelMediaSection = true;
-
-        }
-
-        return dataChannel;
-
-    }
-
-    private async void SetupTransport(DtlsRole role, Sdp localSdpObject)
-    {
-        if (localSdpObject == null)
-        {
-            localSdpObject = pc.CurrentLocalDescription.sdp.ToSdp();
-        }
-
-        DtlsParameters dtlsParameters = CommonUtils.ExtractDtlsParameters(localSdpObject);
-        dtlsParameters.role = role;
-
-        remoteSdp.UpdateDtlsRole(role);
-
-        _ = await SafeEmit("connect", dtlsParameters);
-
-        _transportReady = true;
-    }
-
-
-    private void AssertNotClosed()
-    {
-        if (isClosed)
-        {
-            throw new InvalidOperationException("method called in a closed handler");
-        }
-    }
-
-
-    private void AssertSendDirection()
-    {
-        if (direction != "send")
-        {
-            throw new InvalidOperationException("Method can only be called for handlers with 'send' direction");
-        }
-    }
-
-    private void AssertRecvDirection()
-    {
-        if (direction != "recv")
-        {
-            throw new InvalidOperationException("Method can only be called for handlers with 'recv' direction");
-        }
-    }
-
-    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
-    {
-        RTCSessionDescriptionAsyncOperation _offer = pc.CreateOffer();
-        yield return _offer;
-    }
-
-    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
-    {
-        RTCSessionDescriptionAsyncOperation _answer = peerConnection.CreateAnswer();
-        yield return _answer;
-    }
-
-    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferIceRestartAsync(RTCPeerConnection peerConnection)
-    {
-        RTCOfferAnswerOptions options = new RTCOfferAnswerOptions
-        {
-            iceRestart = true
+            type = RTCSdpType.Offer,
+            sdp = remoteSdp.GetSdp()
         };
-        RTCSessionDescriptionAsyncOperation _offer = peerConnection.CreateOffer(ref options);
-        yield return _offer;
+        _ = await SetRemoteDescriptionAsync(pc, offerDesc);
+        RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
+        if (!_transportReady)
+        {
+            Sdp localSdpObject = answer.Desc.sdp.ToSdp();
+            SetupTransport(DtlsRole.client, localSdpObject);
+        }
+        _ = await SetLocalDescriptionAsync(pc, answer.Desc);
+        _hasDataChannelMediaSection = true;
     }
-
-    IEnumerator SetLocalDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription offerDesc)
+    return dataChannel;
+}
+private async void SetupTransport(DtlsRole role, Sdp localSdpObject)
+{
+    if (localSdpObject == null)
     {
-        RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetLocalDescription(ref offerDesc);
-        yield return localDesc;
+        localSdpObject = pc.CurrentLocalDescription.sdp.ToSdp();
     }
-
-    IEnumerator SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
+    DtlsParameters dtlsParameters = CommonUtils.ExtractDtlsParameters(localSdpObject);
+    dtlsParameters.role = role;
+    remoteSdp.UpdateDtlsRole(role);
+    _ = await SafeEmit("connect", dtlsParameters);
+    _transportReady = true;
+}
+private void AssertNotClosed()
+{
+    if (isClosed)
     {
-        RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetRemoteDescription(ref sessionDescription);
-        yield return localDesc;
+        throw new InvalidOperationException("method called in a closed handler");
     }
-
-    IEnumerator<RTCStatsReportAsyncOperation> GetPcStats(RTCPeerConnection peerConnection)
+}
+private void AssertSendDirection()
+{
+    if (direction != "send")
     {
-        RTCStatsReportAsyncOperation report = pc.GetStats();
-        yield return report;
+        throw new InvalidOperationException("Method can only be called for handlers with 'send' direction");
     }
-
-    IEnumerator<RTCStatsReportAsyncOperation> GetTransreceiverStats(RTCRtpTransceiver transreceiver)
+}
+private void AssertRecvDirection()
+{
+    if (direction != "recv")
     {
-        RTCStatsReportAsyncOperation report = transreceiver.Sender.GetStats();
-        yield return report;
+        throw new InvalidOperationException("Method can only be called for handlers with 'recv' direction");
     }
+}
+IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
+{
+    RTCSessionDescriptionAsyncOperation _offer = pc.CreateOffer();
+    yield return _offer;
+}
+IEnumerator<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
+{
+    RTCSessionDescriptionAsyncOperation _answer = peerConnection.CreateAnswer();
+    yield return _answer;
+}
+IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferIceRestartAsync(RTCPeerConnection peerConnection)
+{
+    RTCOfferAnswerOptions options = new RTCOfferAnswerOptions
+    {
+        iceRestart = true
+    };
+    RTCSessionDescriptionAsyncOperation _offer = peerConnection.CreateOffer(ref options);
+    yield return _offer;
+}
+IEnumerator SetLocalDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription offerDesc)
+{
+    RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetLocalDescription(ref offerDesc);
+    yield return localDesc;
+}
+IEnumerator SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
+{
+    RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetRemoteDescription(ref sessionDescription);
+    yield return localDesc;
+}
+IEnumerator<RTCStatsReportAsyncOperation> GetPcStats(RTCPeerConnection peerConnection)
+{
+    RTCStatsReportAsyncOperation report = pc.GetStats();
+    yield return report;
+}
+IEnumerator<RTCStatsReportAsyncOperation> GetTransreceiverStats(RTCRtpTransceiver transreceiver)
+{
+    RTCStatsReportAsyncOperation report = transreceiver.Sender.GetStats();
+    yield return report;
+}
 
 }
 
@@ -1026,47 +883,36 @@ public class HandlerRunOptions
     public object proprietaryConstraints;
     public ExtendedRtpCapabilities extendedRtpCapabilities;
 }
-
 public class HandlerSendOptions
 {
     public MediaStreamTrack track;
     public List<RtpEncodingParameters> encodings = new List<RtpEncodingParameters>();
     public ProducerCodecOptions codecOptions = new ProducerCodecOptions();
     public RtpCodecCapability codec = new RtpCodecCapability();
-
     public RTCRtpEncodingParameters[] GetRTCRtpTransceivers(List<RtpEncodingParameters> rtps)
     {
         List<RTCRtpEncodingParameters> rtpEncoding = new List<RTCRtpEncodingParameters>();
-
         foreach (RtpEncodingParameters rtp in rtps)
         {
             RTCRtpEncodingParameters temp = new RTCRtpEncodingParameters();
-            
             if(rtp.MaxBitrate.HasValue)
                 temp.maxBitrate = (ulong)rtp.MaxBitrate.Value;
             if (rtp.MaxFramerate.HasValue)
                 temp.maxFramerate = (uint)rtp.MaxFramerate.Value;
-
-                temp.rid = rtp.Rid;
-
+            temp.rid = rtp.Rid;
             if (rtp.ScaleResolutionDownBy.HasValue)
                 temp.scaleResolutionDownBy = rtp.ScaleResolutionDownBy;
-
             rtpEncoding.Add(temp);
         }
-
         return rtpEncoding.ToArray();
     }
-
 }
-
 public class HandlerSendResult
 {
     public string localId;
     public RtpParameters rtpParameters;
     public RTCRtpSender rtpSender;
 }
-
 public class HandlerReceiveOptions
 {
     public string trackId;
@@ -1074,37 +920,30 @@ public class HandlerReceiveOptions
     public RtpParameters rtpParameters;
     public string streamId;
 }
-
 public class HandlerReceiveResult
 {
     public string localId;
     public MediaStreamTrack track;
     public RTCRtpReceiver rtpReceiver;
 }
-
 public class HandlerSendDataChannelOptions : SctpStreamParameters
 {
-
 }
-
 public class HandlerSendDataChannelResult
 {
     public RTCDataChannel dataChannel;
     public SctpStreamParameters sctpStreamParameters;
 }
-
 public class HandlerReceiveDataChannelResult
 {
     public RTCDataChannel dataChannel;
 }
-
 public class HandlerReceiveDataChannelOptions
 {
     public SctpStreamParameters sctpStreamParameters;
     public string label;
     public string protocol;
 }
-
 public class HandlerEvents
 {
 

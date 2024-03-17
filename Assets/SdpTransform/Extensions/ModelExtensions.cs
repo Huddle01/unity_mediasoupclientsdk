@@ -748,7 +748,7 @@ namespace Utilme.SdpTransform
         }
 
         public static string ToText(this MsidSemantic msidSemantic) =>
-            $"{Sdp.AttributeIndicator}{MsidSemantic.Label}" +
+            $"{Sdp.AttributeIndicator}{MsidSemantic.Label}" + $"{msidSemantic.WebRtcMediaStreamToken} " + 
                 $"{msidSemantic.Token} " +
                 $"{(msidSemantic.IdList is not null ? string.Join(" ", msidSemantic.IdList) : string.Empty)}" +
                 $"{Sdp.CRLF}";
@@ -854,8 +854,8 @@ namespace Utilme.SdpTransform
 
         public static string ToText(this Fingerprint fingerprint) =>
             $"{Sdp.AttributeIndicator}{Fingerprint.Label}" +
-                $"{fingerprint.HashFunction.GetStringValue()} " +
-                $"{BitConverter.ToString(fingerprint.HashValue).Replace("-", ":")}" +
+                $"{fingerprint.HashFunction.GetStringValue()}" + $"{Sdp.CRLF}" +
+                $"{System.Text.Encoding.UTF8.GetString(fingerprint.HashValue).Replace("-", ":")}" +
                 $"{Sdp.CRLF}";
 
         public static Rtcp ToRtcp(this string str)

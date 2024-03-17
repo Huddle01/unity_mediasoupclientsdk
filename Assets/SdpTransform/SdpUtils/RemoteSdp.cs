@@ -72,6 +72,7 @@ public class RemoteSdp
 
             int numFingerPrints = _dtlsParameters.fingerprints.Count;
             DtlsFingerprint stldFingerPrint = _dtlsParameters.fingerprints[numFingerPrints - 1];
+            Debug.Log($"DTLS Fingerprints: {JsonUtility.ToJson(_dtlsParameters.fingerprints)}");
             Fingerprint fingerPrint = new Fingerprint();
 
             switch (stldFingerPrint.algorithm)
@@ -98,13 +99,17 @@ public class RemoteSdp
             }
 
             fingerPrint.HashValue = Encoding.UTF8.GetBytes(stldFingerPrint.value);
+            //fingerPrint.HashValue = Encoding.UTF8.GetBytes(stldFingerPrint.value);
 
             sdpObject.Attributes.Fingerprint = fingerPrint;
+
+            Debug.Log($"Fingerprint Algorithm: ${fingerPrint.HashFunction.ToString()}, Hash Value: {fingerPrint.HashValue}");
 
             sdpObject.Attributes.Group = new Group 
             {
                 Semantics = GroupSemantics.Bundle,
-                SemanticsExtensions = new string[] {"audio","video"}
+                // TODO: Check this parameter
+                SemanticsExtensions = new string[] { "0" },
             };
 
         }
@@ -122,6 +127,8 @@ public class RemoteSdp
                 sdpObject.Origin.AddrType = AddrType.Ip6;
             }
         }
+
+        Debug.Log($"Final Remote SDP object: { sdpObject.ToText()}");
 
     }
 
