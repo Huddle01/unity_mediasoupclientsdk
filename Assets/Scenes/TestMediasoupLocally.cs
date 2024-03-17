@@ -163,7 +163,7 @@ public class TestMediasoupLocally : MonoBehaviour
                                                 iceTransportPolicy, additionalSettings, proprietaryConstraints, appData);
 
         SendTransport.On("connect", async (args) =>
-        {
+        {  
             var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
             DtlsParameters dtlsParams = parameters.Item1;
 

@@ -682,6 +682,9 @@ namespace Utilme.SdpTransform
                 .Replace(Sdp.MediaDescriptionIndicator, string.Empty)
                 .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
+            var Fmts = string.Join(" ", tokens.Skip(3).ToList().ToArray());
+            Debug.Log($"FMTS While Creation: {Fmts} ");
+
             return new MediaDescription
             {
                 Media = tokens[0].EnumFromStringValue<MediaType>(),
@@ -694,9 +697,9 @@ namespace Utilme.SdpTransform
         public static string ToText(this MediaDescription mediaDescription) 
         {
             Debug.Log($"Media Des Check {mediaDescription is null}");
-            Debug.Log($"Media Des Check {mediaDescription.Port}");
-            Debug.Log($"Media Des Check {mediaDescription.Proto}");
-            Debug.Log($"Media Des Check {mediaDescription.Fmts is null}");
+            Debug.Log($"Media Port Check {mediaDescription.Media.GetStringValue()} {mediaDescription.Port} {mediaDescription.Proto}");
+            Debug.Log($"Media Proto Check {mediaDescription.Proto}");
+            Debug.Log($"Media Fmts Check {string.Join(" ", mediaDescription.Fmts.ToArray())}");
             return $"{Sdp.MediaDescriptionIndicator}" +
                     $"{mediaDescription.Media.GetStringValue()} {mediaDescription.Port} {mediaDescription.Proto} " +
                     $"{string.Join(" ", mediaDescription.Fmts.ToArray())}" +
@@ -854,7 +857,7 @@ namespace Utilme.SdpTransform
 
         public static string ToText(this Fingerprint fingerprint) =>
             $"{Sdp.AttributeIndicator}{Fingerprint.Label}" +
-                $"{fingerprint.HashFunction.GetStringValue()}" + $"{Sdp.CRLF}" +
+                $"{fingerprint.HashFunction.GetStringValue()} " +
                 $"{System.Text.Encoding.UTF8.GetString(fingerprint.HashValue).Replace("-", ":")}" +
                 $"{Sdp.CRLF}";
 
@@ -970,6 +973,7 @@ namespace Utilme.SdpTransform
                 $"{candidate.Foundation} {candidate.ComponentId} {candidate.Transport.GetStringValue()} " +
                 $"{candidate.Priority} {candidate.ConnectionAddress} {candidate.Port} {Candidate.Typ} " +
                 $"{candidate.Type.GetStringValue()}" +
+                $"{(!string.IsNullOrEmpty(candidate.TCPType) ? $" tcptype {candidate.TCPType}" : string.Empty)}" +
                 $"{(candidate.RelAddr is not null ? $" {Candidate.Raddr} {candidate.RelAddr}" : string.Empty)}" +
                 $"{(candidate.RelPort.HasValue ? $" {Candidate.Rport} {candidate.RelPort}" : string.Empty)}" +
                 $"{(candidate.Extensions is null ? string.Empty : string.Join("", candidate.Extensions.Select(pair => " " + pair.Item1 + " " + pair.Item2).ToArray()))}" +

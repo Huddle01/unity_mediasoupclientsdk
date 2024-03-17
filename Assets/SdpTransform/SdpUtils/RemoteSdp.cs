@@ -52,7 +52,7 @@ public class RemoteSdp
 
         sdpObject.Timings = new List<Timing>
         {
-            new Timing{StartTime=DateTime.MinValue,StopTime=DateTime.MinValue }
+            new Timing{StartTime=DateTimeOffset.FromUnixTimeSeconds(0).UtcDateTime,StopTime=DateTimeOffset.FromUnixTimeSeconds(0).UtcDateTime }
         };
 
 
@@ -63,6 +63,7 @@ public class RemoteSdp
         if (_iceParameters != null && _iceParameters.iceLite)
         {
             //sdpObject.Attributes.IceLiteLabel = "ice-lite";
+            sdpObject.Attributes.IceLite = true;
         }
 
         // If DTLS parameters are given, assume WebRTC and BUNDLE.

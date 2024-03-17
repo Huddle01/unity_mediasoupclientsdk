@@ -187,6 +187,7 @@ public class AnswerMediaSection  : MediaSection
             {
                 _mediaObject.ConnectionData = new ConnectionData { ConnectionAddress = "127.0.0.0" };
                 _mediaObject.Port = 7;
+                _mediaObject.Proto = tempMediaDes.Proto;
             }
             else 
             {
@@ -200,6 +201,7 @@ public class AnswerMediaSection  : MediaSection
                 case MediaType.Audio:
                 case MediaType.Video:
                     _mediaObject.Direction = "recvonly";
+                    _mediaObject.Attributes.RecvOnly = true;
                     _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
                     _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
                     _mediaObject.Attributes.Fmtps = new List<Fmtp>();
@@ -517,6 +519,9 @@ public class AnswerMediaSection  : MediaSection
                             Debug.Log("Implement Simulcast03"); // currently dont know what it is
                         }
 
+                        _mediaObject.Attributes.RtcpRsize = true;
+                        _mediaObject.Attributes.RtcpMux = true;
+
                         if (_planB && _mediaObject.Media == MediaType.Video) 
                         {
                             //_mediaObject.xGoogleFlag = 'conference';
@@ -587,6 +592,7 @@ public class AnswerMediaSection  : MediaSection
     public override void Resume() 
     {
         _mediaObject.Direction = "recvonly";
+        _mediaObject.Attributes.RecvOnly = true;
     }
 
     public override void SetDtlsRole(DtlsRole _dtlsRole)
@@ -674,6 +680,7 @@ public class OfferMediaSection : MediaSection
                 _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
                 _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
                 _mediaObject.Attributes.Fmtps = new List<Fmtp>();
+                _mediaObject.Attributes.SendOnly = true;
 
                 if (!_planB) 
                 {
@@ -862,6 +869,7 @@ public class OfferMediaSection : MediaSection
     public override void Resume()
     {
         _mediaObject.Direction = "sendonly";
+        _mediaObject.Attributes.SendOnly = true;
     }
 
     public override void SetDtlsRole(DtlsRole _dtlsRole)
