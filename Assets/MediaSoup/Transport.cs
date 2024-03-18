@@ -59,7 +59,7 @@ namespace Mediasoup.Transports
         Task RestartIceAsync(IceParameters iceParameters);
         Task UpdateIceServers(List<RTCIceServer> iceServers);
 
-        Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<int>> GetProducerIdCallback,
+        Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
         ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new();
 
         Task<Consumer<AppData>> ConsumeAsync<ConsumerAppData>(
@@ -261,7 +261,7 @@ namespace Mediasoup.Transports
 
         }
 
-        public async Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<int>> GetProducerIdCallback,
+        public async Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
                                     ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new()
         {
             if (isClosed)
@@ -345,13 +345,12 @@ namespace Mediasoup.Transports
 
             Producer<ProducerAppData> tempproducer = null;
 
-            try
-            {
+            
                 ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
                 _ = await SafeEmit("produce", options.track.Kind, handlerSendResult.rtpParameters);
 
                 //Adding a func param so that a method can be injected which can provide producer id
-                int num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters, appData);
+                string num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters, appData);
 
                 tempproducer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId,
                     handlerSendResult.rtpSender, options.track, handlerSendResult.rtpParameters, options.stopTracks,
@@ -364,11 +363,7 @@ namespace Mediasoup.Transports
 
                 _ = await observer.SafeEmit("newproducer", tempproducer);
                 return tempproducer;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Cant produce {ex.Message}");
-            }
+            
 
         }
 
@@ -414,19 +409,16 @@ namespace Mediasoup.Transports
 
             pendingConsumerTasks.Add(consumerCreationTask);
 
-            // There is no Consumer creation in progress, create it now.
-            _ = Task.Run(() =>
-              {
-                  if (isClosed)
-                  {
-                      return;
-                  }
+            if (isClosed)
+            {
+                return null;
+            }
 
-                  if (!consumerCreationInProgress)
-                  {
-                      CreatePendingConsumer<ConsumerAppData>();
-                  }
-              });
+            if (!consumerCreationInProgress)
+            {
+                await CreatePendingConsumer<ConsumerAppData>();
+            }
+
 
             return await consumerCreationTask.Promise;
 

@@ -42,7 +42,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
     private string _socketUrl = "ws://localhost:8080";
 
-    private int _producerId;
+    private string _producerId;
 
     public ProducerOptions<AppData> ProducerOptionsObj;
 
@@ -196,29 +196,6 @@ public class TestMediasoupLocally : MonoBehaviour
         SendTransport.On("produce", async (args) =>
         {
             Debug.Log("Send Transport starting to produce");
-            //var parameters = (Tuple<TrackKind, RtpParameters, AppData>) ;
-            TrackKind kind = (TrackKind) args[0];
-            RtpParameters rtpParameters = (RtpParameters) args[1];
-
-            var responseData = new
-            {
-                transportId = SendTransport.id,
-                kind = kind == TrackKind.Audio ? "audio" : "video",
-                rtpParameters = rtpParameters,
-            };
-
-            var data = new { type = "transport-produce", data = responseData };
-
-            var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
-
-            Debug.Log($"transport-produce request: {encodedPayload}");
-
-            await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
-
-            string receivedResult = await ReceiveMessage(_websocket);
-
-            _producerId = int.Parse(receivedResult);
-
         });
     }
 
@@ -239,8 +216,28 @@ public class TestMediasoupLocally : MonoBehaviour
 
     }
 
-    private async Task<int> GetProducerId(TrackKind kind, RtpParameters rtp, AppData _appdata)
+    private async Task<string> GetProducerId(TrackKind kind, RtpParameters rtp, AppData _appdata)
     {
+        RtpParameters rtpParameters = rtp;
+        var responseData = new
+        {
+            transportId = SendTransport.id,
+            kind = kind == TrackKind.Audio ? "audio" : "video",
+            rtpParameters = rtpParameters,
+        };
+
+        var data = new { type = "transport-produce", data = responseData };
+
+        var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+
+        Debug.Log($"transport-produce request: {encodedPayload}");
+
+        await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
+
+        string receivedResult = await ReceiveMessage(_websocket);
+
+        _producerId = receivedResult;
+        Debug.Log($"ProduceID {_producerId}");
         return _producerId;
     }
 
@@ -316,6 +313,8 @@ public class TestMediasoupLocally : MonoBehaviour
 
     public async void ConnectRevcTransportAndConsume()
     {
+        Debug.Log("ConnectRevcTransportAndConsume()");
+
         var responseData = new Dictionary<string, object>
         {
             { "rtpCapabilities", DeviceObj.GetRtpCapabilities() }
@@ -347,6 +346,8 @@ public class TestMediasoupLocally : MonoBehaviour
             kind = mediaKind,
             rtpParameters = rtpParameters
         };
+
+        Debug.Log("Create Consumer Obj");
 
         ConsumerObj = await ReceiveTransport.ConsumeAsync<AppData>();
 

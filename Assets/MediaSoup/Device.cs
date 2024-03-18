@@ -39,7 +39,7 @@ namespace Mediasoup
 
         public RtpCapabilities GetRtpCapabilities() 
         {
-            return rtpCapabilities;
+            return recvRtpCapabilities;
         }
 
         public SctpCapabilities GetSctpCapabilities() 
