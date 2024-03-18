@@ -702,7 +702,7 @@ namespace Utilme.SdpTransform
             Debug.Log($"Media Fmts Check {string.Join(" ", mediaDescription.Fmts.ToArray())}");
             return $"{Sdp.MediaDescriptionIndicator}" +
                     $"{mediaDescription.Media.GetStringValue()} {mediaDescription.Port} {mediaDescription.Proto} " +
-                    $"101" +
+                     $"{(mediaDescription.ExtraParam is not null ? string.Join(" ", mediaDescription.ExtraParam) : string.Empty)}" +
                     $"{Sdp.CRLF}";
         }
             

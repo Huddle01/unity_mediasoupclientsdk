@@ -11,6 +11,8 @@ namespace Utilme.SdpTransform
 
         public string Proto { get; set; }
 
+        public IList<string> ExtraParam { get; set; }
+
         public IList<string> Fmts { get; set; }
 
         // Session overrides.

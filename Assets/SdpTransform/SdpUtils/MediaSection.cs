@@ -205,6 +205,7 @@ public class AnswerMediaSection  : MediaSection
                     _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
                     _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
                     _mediaObject.Attributes.Fmtps = new List<Fmtp>();
+                    _mediaObject.ExtraParam = new List<string>();
 
                     if (_answerRtp!=null) 
                     {
@@ -449,6 +450,7 @@ public class AnswerMediaSection  : MediaSection
                                 if (!string.IsNullOrEmpty(fmtp.Value)) 
                                 {
                                     _mediaObject.Attributes.Fmtps.Add(fmtp);
+                                    _mediaObject.ExtraParam.Add(fmtp.PayloadType.ToString());
                                 }
 
                                 foreach (var fb in codecRtcpFeedback)
