@@ -71,7 +71,7 @@ public class TestMediasoupLocally : MonoBehaviour
                         },
 
             codecOptions = { videoGoogleStartBitrate = 1000 },
-            codec = {MimeType = "video/VP8",ClockRate = 90000 },
+            codec = { MimeType = "video/VP8", ClockRate = 90000 },
         };
 
         _websocket = new ClientWebSocket();
@@ -135,76 +135,87 @@ public class TestMediasoupLocally : MonoBehaviour
 
         var jsonParsed = JObject.Parse(receivedMessage);
 
-        string id = (string)jsonParsed["id"];
-        
+        string id = (string)jsonParsed["data"]["id"];
+
         IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>(jsonParsed["data"]["iceParameters"].ToString());
-        
+
         List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>(jsonParsed["data"]["iceCandidates"].ToString());
 
         DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>(jsonParsed["data"]["dtlsParameters"].ToString());
 
-        SctpParameters sctpParameters = null; 
+        SctpParameters sctpParameters = null;
         if (jsonParsed["data"]["sctpParameters"] != null) JsonConvert.DeserializeObject<SctpParameters>(jsonParsed["data"]["sctpParameters"].ToString());
-        
+
         List<RTCIceServer> iceServers = null;
         if (jsonParsed["data"]["iceServers"] != null) JsonConvert.DeserializeObject<List<RTCIceServer>>(jsonParsed["data"]["iceServers"].ToString());
-        
+
         RTCIceTransportPolicy iceTransportPolicy = RTCIceTransportPolicy.All;
         if (jsonParsed["data"]["iceTransportPolicy"] != null) JsonConvert.DeserializeObject<RTCIceTransportPolicy>(jsonParsed["data"]["iceTransportPolicy"].ToString());
-        
+
         object additionalSettings = null;
         if (jsonParsed["data"]["additionalSettings"] != null) JsonConvert.DeserializeObject<object>(jsonParsed["data"]["additionalSettings"].ToString());
-        
+
         object proprietaryConstraints = null;
         if (jsonParsed["data"]["proprietaryConstraints"] != null) JsonConvert.DeserializeObject<object>(jsonParsed["data"]["proprietaryConstraints"].ToString());
-        
+
         AppData appData = new AppData();
         SendTransport = DeviceObj.CreateSendTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
                                                 iceTransportPolicy, additionalSettings, proprietaryConstraints, appData);
 
         SendTransport.On("connect", async (args) =>
-        {  
-            var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
-            DtlsParameters dtlsParams = parameters.Item1;
+        {
+            Debug.Log("Send Transport connected");
+            DtlsParameters dtlsParameters = (DtlsParameters)args[0];
+            Action callBack = (Action)args[1];
+            Action<Exception> errBack = (Action<Exception>)args[2];
 
-            var responseData = new Dictionary<string, object>
+            try
+            {
+                var responseData = new Dictionary<string, object>
             {
                 { "transportId", SendTransport.id },
-                { "dtlsParameters", dtlsParams}
+                { "dtlsParameters", dtlsParameters}
             };
 
-            //convert disctionary to json
-            string responsePayload = JsonConvert.SerializeObject(responseData);
+                var responseObj = new { type = "transport-connect", data = responseData };
 
-            var data = new { type = "transport-connect", data = responsePayload };
+                var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(responseObj));
 
-            var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+                await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
 
-            await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
-
-            parameters.Item2?.Invoke();
+                callBack();
+            }
+            catch (Exception ex)
+            {
+                errBack(ex);
+            }
 
         });
 
         SendTransport.On("produce", async (args) =>
         {
-            var parameters = (Tuple<TrackKind, RtpParameters, AppData, Action<int>>)args[0];
-            //todo write logic to get producer id
+            Debug.Log("Send Transport starting to produce");
+            //var parameters = (Tuple<TrackKind, RtpParameters, AppData>) ;
+            TrackKind kind = (TrackKind) args[0];
+            Debug.Log($"Parameters: {kind.ToString()} }");
+            RtpParameters rtpParameters = (RtpParameters) args[1];
+            Debug.Log($"Parameters: {kind.ToString()} , {rtpParameters.ToString()}");
+            AppData appData = (AppData) args[2];
+            Debug.Log($"Parameters: {kind.ToString()} , {rtpParameters.ToString()} {appData.ToString()}");
 
-            var responseData = new Dictionary<string, object>
+            var responseData = new
             {
-                { "transportId", SendTransport.id },
-                { "kind", parameters.Item1.ToString()},
-                { "rtpParameters", parameters.Item2},
-                { "appData", parameters.Item3}
+                transportId = SendTransport.id,
+                kind = kind == TrackKind.Audio ? "audio" : "video",
+                rtpParameters = rtpParameters,
+                appData = appData
             };
 
-
-            string responsePayload = JsonConvert.SerializeObject(responseData);
-
-            var data = new { type = "transport-produce", data = responsePayload };
+            var data = new { type = "transport-produce", data = responseData };
 
             var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+
+            Debug.Log($"transport-produce request: {encodedPayload}");
 
             await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
 
@@ -212,14 +223,12 @@ public class TestMediasoupLocally : MonoBehaviour
 
             _producerId = int.Parse(receivedResult);
 
-            parameters.Item4?.Invoke(_producerId);
-
         });
     }
 
     public async void ConnectSendTransportAndProduce()
     {
-        
+
         ProducerObj = await SendTransport.ProduceAsync(GetProducerId, ProducerOptionsObj);
 
         ProducerObj.On("trackended", async (args) =>
@@ -242,25 +251,39 @@ public class TestMediasoupLocally : MonoBehaviour
     public async void CreateRevcTransport()
     {
         if (DeviceObj == null) return;
-
-        var encoded = Encoding.UTF8.GetBytes("createWebRtcTransport");
+        var data = new { type = "createWebRtcTransport", data = new { sender = false } };
+        var encoded = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
         await _websocket.SendAsync(encoded, WebSocketMessageType.Text, true, CancellationToken.None);
 
         string receivedMessage = await ReceiveMessage(_websocket);
-
+        Debug.Log($"Received: {receivedMessage}");
         if (string.IsNullOrEmpty(receivedMessage)) return;
+
         var jsonParsed = JObject.Parse(receivedMessage);
 
-
         string id = (string)jsonParsed["id"];
-        IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>((string)jsonParsed["iceParameters"]);
-        List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>((string)jsonParsed["iceParameters"]);
-        DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>((string)jsonParsed["dtlsParameters"]);
-        SctpParameters sctpParameters = JsonConvert.DeserializeObject<SctpParameters>((string)jsonParsed["sctpParameters"]);
-        List<RTCIceServer> iceServers = JsonConvert.DeserializeObject<List<RTCIceServer>>((string)jsonParsed["iceServers"]);
-        RTCIceTransportPolicy iceTransportPolicy = JsonConvert.DeserializeObject<RTCIceTransportPolicy>((string)jsonParsed["iceTransportPolicy"]);
-        object additionalSettings = JsonConvert.DeserializeObject<object>((string)jsonParsed["additionalSettings"]);
-        object proprietaryConstraints = JsonConvert.DeserializeObject<object>((string)jsonParsed["proprietaryConstraints"]);
+
+        IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>(jsonParsed["data"]["iceParameters"].ToString());
+
+        List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>(jsonParsed["data"]["iceCandidates"].ToString());
+
+        DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>(jsonParsed["data"]["dtlsParameters"].ToString());
+
+        SctpParameters sctpParameters = null;
+        if (jsonParsed["data"]["sctpParameters"] != null) JsonConvert.DeserializeObject<SctpParameters>(jsonParsed["data"]["sctpParameters"].ToString());
+
+        List<RTCIceServer> iceServers = null;
+        if (jsonParsed["data"]["iceServers"] != null) JsonConvert.DeserializeObject<List<RTCIceServer>>(jsonParsed["data"]["iceServers"].ToString());
+
+        RTCIceTransportPolicy iceTransportPolicy = RTCIceTransportPolicy.All;
+        if (jsonParsed["data"]["iceTransportPolicy"] != null) JsonConvert.DeserializeObject<RTCIceTransportPolicy>(jsonParsed["data"]["iceTransportPolicy"].ToString());
+
+        object additionalSettings = null;
+        if (jsonParsed["data"]["additionalSettings"] != null) JsonConvert.DeserializeObject<object>(jsonParsed["data"]["additionalSettings"].ToString());
+
+        object proprietaryConstraints = null;
+        if (jsonParsed["data"]["proprietaryConstraints"] != null) JsonConvert.DeserializeObject<object>(jsonParsed["data"]["proprietaryConstraints"].ToString());
+
         AppData appData = new AppData();
 
         ReceiveTransport = DeviceObj.CreateRecvTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,

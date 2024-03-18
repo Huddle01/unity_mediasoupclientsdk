@@ -683,7 +683,7 @@ namespace Utilme.SdpTransform
                 .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
             var Fmts = string.Join(" ", tokens.Skip(3).ToList().ToArray());
-            Debug.Log($"FMTS While Creation: {Fmts} ");
+            //Debug.Log($"FMTS While Creation: {Fmts} ");
 
             return new MediaDescription
             {
@@ -702,7 +702,7 @@ namespace Utilme.SdpTransform
             Debug.Log($"Media Fmts Check {string.Join(" ", mediaDescription.Fmts.ToArray())}");
             return $"{Sdp.MediaDescriptionIndicator}" +
                     $"{mediaDescription.Media.GetStringValue()} {mediaDescription.Port} {mediaDescription.Proto} " +
-                    $"{string.Join(" ", mediaDescription.Fmts.ToArray())}" +
+                    $"101" +
                     $"{Sdp.CRLF}";
         }
             
@@ -727,8 +727,8 @@ namespace Utilme.SdpTransform
 
         public static string ToText(this Group group) 
         {
-            Debug.Log($"is gropp SemanticsExtensions null {group.SemanticsExtensions is null}");
-            Debug.Log($"is gropp Semantics null {group.Semantics.GetStringValue() is null}");
+            //Debug.Log($"is gropp SemanticsExtensions null {group.SemanticsExtensions is null}");
+            //Debug.Log($"is gropp Semantics null {group.Semantics.GetStringValue() is null}");
 
             return $"{Sdp.AttributeIndicator}{Group.Label}" +
             $"{group.Semantics.GetStringValue()} " +

@@ -17,6 +17,8 @@ using Mediasoup.Types;
 using Newtonsoft.Json.Converters;
 using UnityEngine;
 using Mediasoup.Ortc;
+using System.Security.Cryptography;
+using System.Runtime.Serialization;
 
 /// <summary>
 /// 
@@ -24,7 +26,7 @@ using Mediasoup.Ortc;
 
 namespace Mediasoup.Transports
 {
-    public interface ITransport 
+    public interface ITransport
     {
         string id { get; }
         bool isClosed { get; }
@@ -36,8 +38,8 @@ namespace Mediasoup.Transports
         RTCIceGatheringState iceGatheringState { get; }
         RTCIceConnectionState connectionState { get; }
         AppData appData { get; }
-        Dictionary<string,IProducer> producers { get ; }
-        Dictionary<string,IConsumer> consumers { get; }
+        Dictionary<string, IProducer> producers { get; }
+        Dictionary<string, IConsumer> consumers { get; }
         Dictionary<string, IDataConsumer> dataConsumers { get; }
         Dictionary<string, IDataProducer> datapPorducers { get; }
         bool _probatorConsumerCreated { get; }
@@ -57,13 +59,13 @@ namespace Mediasoup.Transports
         Task RestartIceAsync(IceParameters iceParameters);
         Task UpdateIceServers(List<RTCIceServer> iceServers);
 
-        Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData,Task<int>> GetProducerIdCallback,
+        Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<int>> GetProducerIdCallback,
         ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new();
 
         Task<Consumer<AppData>> ConsumeAsync<ConsumerAppData>(
         ConsumerOptions options = null) where ConsumerAppData : AppData, new();
 
-        Task<DataProducer<AppData>> ProduceDataAsync<DataProducerAppData>(Func<SctpStreamParameters, string, string,AppData, Task<int>> GetProducerIdCallback,
+        Task<DataProducer<AppData>> ProduceDataAsync<DataProducerAppData>(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback,
         DataProducerOptions options = null) where DataProducerAppData : AppData, new();
 
         Task<DataConsumer<AppData>> ConsumeDataAsync<DataConsumerAppData>(
@@ -76,7 +78,7 @@ namespace Mediasoup.Transports
 
     }
 
-    public class Transport<TTransportAppData> : EnhancedEventEmitter<TransportEvents>, ITransport where TTransportAppData:AppData
+    public class Transport<TTransportAppData> : EnhancedEventEmitter<TransportEvents>, ITransport where TTransportAppData : AppData
     {
         public string id { get; private set; }
 
@@ -98,13 +100,13 @@ namespace Mediasoup.Transports
 
         public AppData appData { get; private set; }
 
-        public Dictionary<string, IProducer> producers { get; private set; }
+        public Dictionary<string, IProducer> producers { get; private set; } = new();
 
-        public Dictionary<string, IConsumer> consumers { get; private set; }
+        public Dictionary<string, IConsumer> consumers { get; private set; } = new();
 
-        public Dictionary<string, IDataConsumer> dataConsumers { get; private set; }
+        public Dictionary<string, IDataConsumer> dataConsumers { get; private set; } = new();
 
-        public Dictionary<string, IDataProducer> datapPorducers { get; private set; }
+        public Dictionary<string, IDataProducer> datapPorducers { get; private set; } = new();
 
         public bool _probatorConsumerCreated { get; private set; }
 
@@ -129,17 +131,17 @@ namespace Mediasoup.Transports
         public AwaitQueue awaitQueue;
 
         //Constructor
-        public Transport(string _direction,string _id,IceParameters _iceParameters,List<IceCandidate> _iceCandidate,
-                        DtlsParameters _dtlsParameters,SctpParameters _sctpParameters,List<RTCIceServer> _iceServers,
-                        RTCIceTransportPolicy? _iceTransportPolicy,object _additionalSettings, object _proprietaryConstraints,
+        public Transport(string _direction, string _id, IceParameters _iceParameters, List<IceCandidate> _iceCandidate,
+                        DtlsParameters _dtlsParameters, SctpParameters _sctpParameters, List<RTCIceServer> _iceServers,
+                        RTCIceTransportPolicy? _iceTransportPolicy, object _additionalSettings, object _proprietaryConstraints,
                         TTransportAppData _appData, HandlerInterface handlerFactory, ExtendedRtpCapabilities _extendedRtpCapabilities,
-                        Dictionary<MediaKind, bool> _canProduceKind) 
+                        Dictionary<MediaKind, bool> _canProduceKind)
         {
             id = _id;
             direction = _direction;
             extendedRtpCapabilities = _extendedRtpCapabilities;
             canProduceKind = _canProduceKind;
-            maxSctpMessageSize = _sctpParameters != null? _sctpParameters.maxMessageSize:0;
+            maxSctpMessageSize = _sctpParameters != null ? _sctpParameters.maxMessageSize : 0;
 
             // Clone and sanitize additionalSettings.
             //additionalSettings = utils.clone(additionalSettings) || { };
@@ -168,6 +170,8 @@ namespace Mediasoup.Transports
             handlerInterface.Run(handlerRunOptions);
             observer = new EnhancedEventEmitter<TransportObserverEvents>();
             if (_appData != null) appData = _appData ?? typeof(TTransportAppData).New<TTransportAppData>()!;
+
+            HandleHandler();
         }
 
         public void Close()
@@ -184,7 +188,7 @@ namespace Mediasoup.Transports
 
             connectionState = RTCIceConnectionState.Closed;
 
-            foreach (var item in producers) 
+            foreach (var item in producers)
             {
                 item.Value.TransportClosed();
             }
@@ -220,15 +224,16 @@ namespace Mediasoup.Transports
         }
         public Task RestartIceAsync(IceParameters iceParameters)
         {
-            if (isClosed) 
+            if (isClosed)
             {
                 throw new InvalidOperationException("Closed");
-            }else if (iceParameters==null) 
+            }
+            else if (iceParameters == null)
             {
                 throw new ArgumentNullException("missing iceParameters");
             }
 
-            return awaitQueue.Push(async () => 
+            return awaitQueue.Push(async () =>
             {
                 await handlerInterface.RestartIce(iceParameters);
                 return new object();
@@ -249,38 +254,45 @@ namespace Mediasoup.Transports
 
             _ = awaitQueue.Push<bool>(async () =>
             {
-                await handlerInterface.UpdateIceServers(iceServers); 
+                await handlerInterface.UpdateIceServers(iceServers);
                 return true;
 
             }, "transport.UpdateIceServers");
 
         }
 
-        public async Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<int>> GetProducerIdCallback, 
+        public async Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<int>> GetProducerIdCallback,
                                     ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new()
         {
             if (isClosed)
             {
                 throw new InvalidOperationException("Closed");
-            } else if (options.track == null)
+            }
+            else if (options.track == null)
             {
                 throw new ArgumentNullException("missing track");
-            } else if (direction != "send")
+            }
+            else if (direction != "send")
             {
                 throw new InvalidOperationException("not a sending transport");
-            } else if (canProduceKind == null)// todo will write a better check system 
+            }
+            else if (canProduceKind == null)// todo will write a better check system 
             {
                 throw new InvalidOperationException($"cannot produce {options.track.Kind}");
-            } else if (options.track.ReadyState == TrackState.Ended)
+            }
+            else if (options.track.ReadyState == TrackState.Ended)
             {
                 throw new InvalidOperationException("track ended");
-            } else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
+            }
+            else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
             {
                 throw new Exception("no 'connect' listener set into this transport");
-            } else if (ListenerCount("produce") == 0 && connectionState == RTCIceConnectionState.New)
+            }
+            else if (ListenerCount("produce") == 0 && connectionState == RTCIceConnectionState.New)
             {
                 throw new Exception("no 'produce' listener set into this transport");
-            } else if (appData ==null) 
+            }
+            else if (appData == null)
             {
                 throw new InvalidCastException("if given, appData must be an object");
             }
@@ -336,6 +348,7 @@ namespace Mediasoup.Transports
             try
             {
                 ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
+                _ = await SafeEmit("produce", options.track.Kind, handlerSendResult.rtpParameters, options.appData);
 
                 //Adding a func param so that a method can be injected which can provide producer id
                 int num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters, appData);
@@ -352,7 +365,7 @@ namespace Mediasoup.Transports
                 _ = await observer.SafeEmit("newproducer", tempproducer);
                 return tempproducer;
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 throw new Exception($"Cant produce {ex.Message}");
             }
@@ -372,7 +385,7 @@ namespace Mediasoup.Transports
             else if (string.IsNullOrEmpty(options.id))
             {
                 throw new ArgumentNullException("missing id");
-            } 
+            }
             else if (string.IsNullOrEmpty(options.producerId))
             {
                 throw new ArgumentNullException("missing producer id");
@@ -381,7 +394,7 @@ namespace Mediasoup.Transports
             {
                 throw new ArgumentNullException("unsupported media kind");
             }
-            else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New) 
+            else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
             {
                 throw new ArgumentNullException("no 'connect' listener set into this transport");
             }
@@ -390,9 +403,9 @@ namespace Mediasoup.Transports
                 throw new InvalidCastException("if given, appData must be an object");
             }
 
-            var canConsume = ORTC.CanReceive(options.rtpParameters,extendedRtpCapabilities);
+            var canConsume = ORTC.CanReceive(options.rtpParameters, extendedRtpCapabilities);
 
-            if (!canConsume) 
+            if (!canConsume)
             {
                 throw new InvalidOperationException("cannot comsume this producer");
             }
@@ -432,13 +445,16 @@ namespace Mediasoup.Transports
             else if (direction != "send")
             {
                 throw new InvalidOperationException("not a sending transport");
-            } else if (maxSctpMessageSize == -1)
+            }
+            else if (maxSctpMessageSize == -1)
             {
                 throw new InvalidOperationException("SCTP not enabled by remote Transport");
-            } else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
+            }
+            else if (ListenerCount("connect") == 0 && connectionState == RTCIceConnectionState.New)
             {
                 throw new ArgumentNullException("no 'connect' listener set into this transport");
-            } else if (ListenerCount("produceData") == 0)
+            }
+            else if (ListenerCount("produceData") == 0)
             {
                 throw new ArgumentNullException("no 'producedata' listener set into this transport");
             }
@@ -448,40 +464,40 @@ namespace Mediasoup.Transports
             }
 
 
-            if (options.maxPacketLifeTime!=-1 || options.maxPacketLifeTime!=-1) 
+            if (options.maxPacketLifeTime != -1 || options.maxPacketLifeTime != -1)
             {
                 options.ordered = false;
             }
 
-             await awaitQueue.Push(async () =>
-            {
+            await awaitQueue.Push(async () =>
+           {
 
-                HandlerSendDataChannelOptions sendDataOption = new HandlerSendDataChannelOptions 
-                {
-                    ordered = options.ordered,
-                    maxPacketLifeTime = options.maxPacketLifeTime,
-                    maxRetransmits = options.maxRetransmits,
-                    label = options.label,
-                    protocol = options.protocol
-                };
+               HandlerSendDataChannelOptions sendDataOption = new HandlerSendDataChannelOptions
+               {
+                   ordered = options.ordered,
+                   maxPacketLifeTime = options.maxPacketLifeTime,
+                   maxRetransmits = options.maxRetransmits,
+                   label = options.label,
+                   protocol = options.protocol
+               };
 
-                HandlerSendDataChannelResult sendDataResult = await handlerInterface.SendDataChannel(sendDataOption);
+               HandlerSendDataChannelResult sendDataResult = await handlerInterface.SendDataChannel(sendDataOption);
 
-                ORTC.ValidateSctpStreamParameters(sendDataResult.sctpStreamParameters);
+               ORTC.ValidateSctpStreamParameters(sendDataResult.sctpStreamParameters);
 
-                //Adding a func param so that a method can be injected which can provide producer id
-                int num = await GetProducerIdCallback.Invoke(sendDataResult.sctpStreamParameters,options.label, options.protocol, 
-                                                            options.dataConsumerAppData);
+               //Adding a func param so that a method can be injected which can provide producer id
+               int num = await GetProducerIdCallback.Invoke(sendDataResult.sctpStreamParameters, options.label, options.protocol,
+                                                           options.dataConsumerAppData);
 
-                dataProducer = new DataProducer<AppData>(num.ToString(), sendDataResult.dataChannel,
-                                                        sendDataResult.sctpStreamParameters, options.dataConsumerAppData);
+               dataProducer = new DataProducer<AppData>(num.ToString(), sendDataResult.dataChannel,
+                                                       sendDataResult.sctpStreamParameters, options.dataConsumerAppData);
 
-                datapPorducers.Add(dataProducer.id,dataProducer);
-                HandleDataProducer(dataProducer);
-                _ = observer.SafeEmit("newdataproducer", datapPorducers);
-                return dataProducer;
+               datapPorducers.Add(dataProducer.id, dataProducer);
+               HandleDataProducer(dataProducer);
+               _ = observer.SafeEmit("newdataproducer", datapPorducers);
+               return dataProducer;
 
-            }, "transport.produceData()");
+           }, "transport.produceData()");
 
             return dataProducer;
         }
@@ -503,10 +519,12 @@ namespace Mediasoup.Transports
             else if (maxSctpMessageSize == -1)
             {
                 throw new InvalidOperationException("SCTP not enabled by remote Transport");
-            } else if (string.IsNullOrEmpty(options.id))
+            }
+            else if (string.IsNullOrEmpty(options.id))
             {
                 throw new ArgumentNullException("missing id");
-            } else if (string.IsNullOrEmpty(options.datProducerId)) 
+            }
+            else if (string.IsNullOrEmpty(options.datProducerId))
             {
                 throw new ArgumentNullException("missing data producer id");
             }
@@ -523,7 +541,7 @@ namespace Mediasoup.Transports
 
             await awaitQueue.Push(async () =>
             {
-                HandlerReceiveDataChannelOptions sendDataoption = new HandlerReceiveDataChannelOptions 
+                HandlerReceiveDataChannelOptions sendDataoption = new HandlerReceiveDataChannelOptions
                 {
                     label = options.label,
                     protocol = options.protocol,
@@ -534,7 +552,7 @@ namespace Mediasoup.Transports
 
 
                 dataConsumer = new DataConsumer<AppData>(options.id, options.datProducerId,
-                                                        sendDataResult, options.sctpStreamParameters,options.dataConsumerAppData);
+                                                        sendDataResult, options.sctpStreamParameters, options.dataConsumerAppData);
 
                 dataConsumers.Add(dataConsumer.id, dataConsumer);
                 HandleDataConsumer(dataConsumer);
@@ -546,11 +564,11 @@ namespace Mediasoup.Transports
             return dataConsumer;
         }
 
-        public async Task CreatePendingConsumer<ConsumerAppData>() where ConsumerAppData:AppData
+        public async Task CreatePendingConsumer<ConsumerAppData>() where ConsumerAppData : AppData
         {
             await awaitQueue.Push(async () =>
             {
-                if (pendingConsumerTasks.Count==0) 
+                if (pendingConsumerTasks.Count == 0)
                 {
                     Debug.LogError("createPendingConsumers() | there is no Consumer to be created");
                     return new object();
@@ -566,7 +584,7 @@ namespace Mediasoup.Transports
 
                 foreach (ConsumerCreationClass task in tempPendingConsumerTask)
                 {
-                    HandlerReceiveOptions tempOption = new HandlerReceiveOptions 
+                    HandlerReceiveOptions tempOption = new HandlerReceiveOptions
                     {
                         kind = task.ConsumerOptions.kind,
                         streamId = task.ConsumerOptions.streamId,
@@ -577,7 +595,7 @@ namespace Mediasoup.Transports
                     optionsList.Add(tempOption);
                 }
 
-                try 
+                try
                 {
                     List<HandlerReceiveResult> results = await handlerInterface.Receive(optionsList);
 
@@ -596,24 +614,25 @@ namespace Mediasoup.Transports
                         var tempRtpReceiver = result.rtpReceiver;
                         var tempTrack = result.track;
 
-                        Consumer<AppData> tempConsumer = new Consumer<AppData>(tempId,tempLocalId,tempProducerId,
-                                                            tempRtpReceiver,tempTrack, tempRtpParam, tempAppData);
+                        Consumer<AppData> tempConsumer = new Consumer<AppData>(tempId, tempLocalId, tempProducerId,
+                                                            tempRtpReceiver, tempTrack, tempRtpParam, tempAppData);
 
-                        consumers.Add(tempConsumer.id,tempConsumer);
+                        consumers.Add(tempConsumer.id, tempConsumer);
                         HandleConsumer(tempConsumer);
 
-                        if (!_probatorConsumerCreated && videoConsumerForProbator!=null && tempkind=="video")
+                        if (!_probatorConsumerCreated && videoConsumerForProbator != null && tempkind == "video")
                         {
                             videoConsumerForProbator = tempConsumer;
                         }
 
-                        _ = observer.SafeEmit("newconsumer",tempConsumer);
+                        _ = observer.SafeEmit("newconsumer", tempConsumer);
 
                         task.ResolveConsumer(tempConsumer);
 
                     }
 
-                } catch (Exception ex) 
+                }
+                catch (Exception ex)
                 {
                     foreach (var task in pendingConsumerTasks)
                     {
@@ -621,13 +640,13 @@ namespace Mediasoup.Transports
                     }
                 }
 
-                if (videoConsumerForProbator!=null) 
+                if (videoConsumerForProbator != null)
                 {
-                    try 
+                    try
                     {
                         var probatorRtpParameters = ORTC.GenerateProbatorRtpParameters(videoConsumerForProbator.rtpParameters);
 
-                        _ = await handlerInterface.Receive(new List<HandlerReceiveOptions> 
+                        _ = await handlerInterface.Receive(new List<HandlerReceiveOptions>
                         {
                             new HandlerReceiveOptions
                             {
@@ -639,19 +658,19 @@ namespace Mediasoup.Transports
 
                         _probatorConsumerCreated = true;
 
-                    } 
-                    catch (Exception ex) 
+                    }
+                    catch (Exception ex)
                     {
                         throw new Exception("createPendingConsumers() | failed to create Consumer for RTP probation");
                     }
                 }
 
                 return new object();
-            }, "transport.produceData()").ContinueWith(task=> 
+            }, "transport.produceData()").ContinueWith(task =>
             {
                 consumerCreationInProgress = false;
 
-                if (pendingConsumerTasks.Count>0) 
+                if (pendingConsumerTasks.Count > 0)
                 {
                     CreatePendingConsumer<AppData>();
                 }
@@ -751,7 +770,7 @@ namespace Mediasoup.Transports
             {
                 await awaitQueue.Push(async () =>
                 {
-                    if (pendingCloseConsumers.Count==0)
+                    if (pendingCloseConsumers.Count == 0)
                     {
                         Console.WriteLine("closePendingConsumers() | There is no Consumer to be closed");
                         return new object();
@@ -786,28 +805,35 @@ namespace Mediasoup.Transports
 
         }
 
-        private void HandleHandler() 
+        private void HandleHandler()
         {
             handlerInterface.On("@connect", async (args) =>
             {
-                var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
-                DtlsParameters dtlsParams = parameters.Item1;
-                var connectCallback = parameters.Item2;
-                var connectErrback = parameters.Item3;
+                Debug.Log("Received @connect event");
+                DtlsParameters dtlsParams = (DtlsParameters) args[0];
+                Debug.Log("DTLS Parameters " + dtlsParams.ToString());
+                Action connectCallback = (Action) args[1];
+                Debug.Log("Connect call back " + connectCallback.ToString());
+                Action<Exception> connectErrback = (Action<Exception>) args[2];
+                Debug.Log("Err call back " + connectErrback.ToString());
 
-                if (isClosed) { 
-                    connectErrback("closed");
+                Debug.Log("Is Closed: " + isClosed.ToString());
+
+                if (isClosed)
+                {
+                    connectErrback(new Exception("Transport closed"));
                     return;
                 }
 
-                _ = await handlerInterface.SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
+                Debug.Log("Emitting connect event on transport");
+                _ = await SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
             });
 
             handlerInterface.On("@icegatheringstatechange", async (args) =>
             {
                 RTCIceGatheringState _iceGatheringState = (RTCIceGatheringState)args[0];
 
-                if (iceGatheringState == _iceGatheringState) 
+                if (iceGatheringState == _iceGatheringState)
                 {
                     return;
                 }
@@ -816,7 +842,7 @@ namespace Mediasoup.Transports
 
                 if (!isClosed)
                 {
-                    _ = await handlerInterface.SafeEmit("icegatheringstatechange", _iceGatheringState);
+                    _ = await SafeEmit("icegatheringstatechange", _iceGatheringState);
                 }
             });
 
@@ -833,14 +859,14 @@ namespace Mediasoup.Transports
 
                 if (!isClosed)
                 {
-                    _ = await handlerInterface.SafeEmit("connectionstatechange", _connectionState);
+                    _ = await SafeEmit("connectionstatechange", _connectionState);
                 }
             });
 
 
         }
 
-        private void HandleProducer<TAppData>(Producer<TAppData> _producer) where TAppData: AppData
+        private void HandleProducer<TAppData>(Producer<TAppData> _producer) where TAppData : AppData
         {
             _producer.On("@close", async _ =>
             {
@@ -866,7 +892,7 @@ namespace Mediasoup.Transports
 
         private void HandleDataConsumer(DataConsumer<AppData> _dataConsumer)
         {
-            _dataConsumer.On("@close", async _ => 
+            _dataConsumer.On("@close", async _ =>
             {
                 dataConsumers.Remove(_dataConsumer.id);
             });
@@ -888,10 +914,10 @@ namespace Mediasoup.Transports
         public TTransportAppData appData;
     }
 
-    
- 
+
+
     [Serializable]
-    public class IceParameters 
+    public class IceParameters
     {
         public string usernameFragment;
         public string password;
@@ -899,7 +925,7 @@ namespace Mediasoup.Transports
     }
 
     [Serializable]
-    public class IceCandidate 
+    public class IceCandidate
     {
         public string foundation;
         public int priority;
@@ -912,16 +938,20 @@ namespace Mediasoup.Transports
     }
 
     [Serializable]
-    public class DtlsParameters 
+    public class DtlsParameters
     {
         public DtlsRole role;
         public List<DtlsFingerprint> fingerprints = new List<DtlsFingerprint>();
     }
 
-    public enum DtlsRole 
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum DtlsRole
     {
+        [EnumMember(Value = "auto")]
         auto,
+        [EnumMember(Value = "client")]
         client,
+        [EnumMember(Value = "server")]
         server
     }
 
@@ -929,14 +959,19 @@ namespace Mediasoup.Transports
     public enum FingerPrintAlgorithm
     {
         [System.StringValue("sha-1")]
+        [EnumMember(Value = "sha-1")]
         sha1,
         [System.StringValue("sha-224")]
+        [EnumMember(Value = "sha-224")]
         sha224,
         [System.StringValue("sha-256")]
+        [EnumMember(Value = "sha-256")]
         sha256,
         [System.StringValue("sha-384")]
+        [EnumMember(Value = "sha-384")]
         sha384,
         [System.StringValue("sha-512")]
+        [EnumMember(Value = "sha-512")]
         sha512
     }
 
@@ -950,22 +985,22 @@ namespace Mediasoup.Transports
 
 
     [Serializable]
-    
-    public class DtlsFingerprint 
+
+    public class DtlsFingerprint
     {
         public FingerPrintAlgorithm algorithm;
         public string value;
     }
 
     [Serializable]
-    public class PlainRtpParameters 
+    public class PlainRtpParameters
     {
         public string ip;
         public string ipVersion; //
         public int port;
     }
 
-    public class TransportEvents 
+    public class TransportEvents
     {
         public Tuple<DtlsParameters, Action, Action<string>> Connect;
         public Action<RTCIceGatheringState> Icegatheringstatechange;
@@ -974,7 +1009,7 @@ namespace Mediasoup.Transports
         public Tuple<SctpStreamParameters, string, string, object, Action<string>, Action<string>> ProduceData;
     }
 
-    public class TransportObserverEvents 
+    public class TransportObserverEvents
     {
         public List<object> Close { get; set; } = new();
         public Tuple<IProducer> Newproducer { get; set; }
