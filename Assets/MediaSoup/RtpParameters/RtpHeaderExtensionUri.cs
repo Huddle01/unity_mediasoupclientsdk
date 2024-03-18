@@ -1,7 +1,10 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using System.Runtime.Serialization;
 
 namespace Mediasoup.RtpParameter
 {
+    [JsonConverter(typeof(StringEnumConverter))]
     public enum RtpHeaderExtensionUri : byte
     {
         [EnumMember(Value = "urn:ietf:params:rtp-hdrext:sdes:mid")]

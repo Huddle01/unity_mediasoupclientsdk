@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.Remoting.Channels;
-using System.Security.Cryptography;
-using Mediasoup.RtpParameter;
+using Newtonsoft.Json;
 
 namespace Mediasoup.RtpParameter
 {
@@ -17,11 +15,13 @@ namespace Mediasoup.RtpParameter
         /// <summary>
         /// The value that goes in the RTP Payload Type Field. Must be unique.
         /// </summary>
+        [JsonProperty("payloadType")]
         public byte PayloadType { get; set; }
 
         /// <summary>
         /// Transport layer and codec-specific feedback messages for this codec.
         /// </summary>
+        [JsonProperty("rtcpFeedback")]
         public List<RtcpFeedback> RtcpFeedback { get; set; } = new List<RtcpFeedback>(0);
 
         public bool Equals(RtpCodecParameters? other)

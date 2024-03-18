@@ -348,7 +348,7 @@ namespace Mediasoup.Transports
             try
             {
                 ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
-                _ = await SafeEmit("produce", options.track.Kind, handlerSendResult.rtpParameters, options.appData);
+                _ = await SafeEmit("produce", options.track.Kind, handlerSendResult.rtpParameters);
 
                 //Adding a func param so that a method can be injected which can provide producer id
                 int num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters, appData);

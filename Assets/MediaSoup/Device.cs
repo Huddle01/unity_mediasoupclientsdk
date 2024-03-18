@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using Mediasoup.Transports;
 using Mediasoup.Types;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace Mediasoup 
 {
@@ -52,17 +53,21 @@ namespace Mediasoup
                 throw new System.Exception("already loaded");
             }
 
+            UnityEngine.Debug.Log("Got Router RTP Capabilities: " + JsonConvert.SerializeObject(routerRtpCapabilities));
+
             // This may throw
             ORTC.ValidateRtpCapabilities(routerRtpCapabilities);
 
             var nativeRtpCapabilities = await handler.GetNativeRtpCapabilities();
+
+            UnityEngine.Debug.Log("Got native RTP Capabilities: " + JsonConvert.SerializeObject(nativeRtpCapabilities));
 
             // This may throw
             ORTC.ValidateRtpCapabilities(nativeRtpCapabilities);
 
             this.extendedRtpCapabilities = ORTC.GetExtendedRtpCapabilities(routerRtpCapabilities, nativeRtpCapabilities);
 
-            Console.WriteLine("Got Extended RTP Capabilities: ", JsonConvert.SerializeObject(extendedRtpCapabilities));
+            UnityEngine.Debug.Log("Got Extended RTP Capabilities: " + JsonConvert.SerializeObject(extendedRtpCapabilities));
 
             canProduceByKind.Add(MediaKind.AUDIO, ORTC.CanSend(MediaKind.AUDIO, extendedRtpCapabilities));
             canProduceByKind.Add(MediaKind.VIDEO, ORTC.CanSend(MediaKind.VIDEO, extendedRtpCapabilities));
@@ -118,6 +123,8 @@ namespace Mediasoup
 
             ORTC.ValidateIceParameters(iceParameters);
             ORTC.ValidateIceCandidates(iceCandidates);
+
+            UnityEngine.Debug.Log("Transport Constructor: " + JsonConvert.SerializeObject(extendedRtpCapabilities));
 
             return new Transport<AppData>("send", id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
                 iceTransportPolicy, additionalSettings, proprietaryConstraints, appData, handler, extendedRtpCapabilities, canProduceByKind);

@@ -1,5 +1,5 @@
+using Newtonsoft.Json;
 using System;
-using Mediasoup.RtpParameter;
 
 namespace Mediasoup.RtpParameter
 {
@@ -23,23 +23,27 @@ namespace Mediasoup.RtpParameter
         /// Media kind.
         /// Default any media kind.
         /// </summary>
+        [JsonProperty("mimeType")]
         public MediaKind? Kind { get; set; }
 
         /// <summary>
         /// The URI of the RTP header extension, as defined in RFC 5285.
         /// </summary>
+        [JsonProperty("uri")]
         public RtpHeaderExtensionUri Uri { get; set; }
 
         /// <summary>
         /// The preferred numeric identifier that goes in the RTP packet. Must be
         /// unique.
         /// </summary>
+        [JsonProperty("preferredId")]
         public byte PreferredId { get; set; }
 
         /// <summary>
         /// If true, it is preferred that the value in the header be encrypted as per
         /// RFC 6904. Default false.
         /// </summary>
+        [JsonProperty("preferredEncrypt")]
         public bool PreferredEncrypt { get; set; }
 
         /// <summary>
@@ -47,6 +51,7 @@ namespace Mediasoup.RtpParameter
         /// 'sendonly' means that mediasoup can send (but not receive) it. 'recvonly'
         /// means that mediasoup can receive (but not send) it.
         /// </summary>
+        [JsonProperty("direction")]
         public RtpHeaderExtensionDirection? Direction { get; set; }
     }
 }

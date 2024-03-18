@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 
@@ -20,21 +21,25 @@ namespace Mediasoup.RtpParameter
         /// <summary>
         /// The URI of the RTP header extension, as defined in RFC 5285.
         /// </summary>
+        [JsonProperty("uri")]
         public RtpHeaderExtensionUri Uri { get; set; }
 
         /// <summary>
         /// The numeric identifier that goes in the RTP packet. Must be unique.
         /// </summary>
+        [JsonProperty("id")]
         public byte Id { get; set; }
 
         /// <summary>
         /// If true, the value in the header is encrypted as per RFC 6904. Default false.
         /// </summary>
+        [JsonProperty("encrypt")]
         public bool Encrypt { get; set; }
 
         /// <summary>
         /// Configuration parameters for the header extension.
         /// </summary>
+        [JsonProperty("parameters")]
         public IDictionary<string, object>? Parameters { get; set; }
     }
 }

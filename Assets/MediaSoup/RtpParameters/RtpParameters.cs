@@ -17,26 +17,31 @@ namespace Mediasoup.RtpParameter
         /// <summary>
         /// The MID RTP extension value as defined in the BUNDLE specification.
         /// </summary>
+        [JsonProperty("mid")]
         public string? Mid { get; set; }
 
         /// <summary>
         /// Media and RTX codecs in use.
         /// </summary>
+        [JsonProperty("codecs")]
         public List<RtpCodecParameters> Codecs { get; set; }
 
         /// <summary>
         /// RTP header extensions in use.
         /// </summary>
+        [JsonProperty("headerExtensions")]
         public List<RtpHeaderExtensionParameters>? HeaderExtensions { get; set; }
 
         /// <summary>
         /// Transmitted RTP streams and their settings.
         /// </summary>
+        [JsonProperty("encodings")]
         public List<RtpEncodingParameters> Encodings { get; set; } = new List<RtpEncodingParameters>();
 
         /// <summary>
         /// Parameters used for RTCP.
         /// </summary>
+        [JsonProperty("rtcp")]
         public RtcpParameters Rtcp { get; set; } = new RtcpParameters();
     }
 
@@ -88,11 +93,13 @@ namespace Mediasoup.RtpParameter
     [Serializable]
     public class RtcpFeedback
     {
+        [JsonProperty("type")]
         public string Type { get; set; }
 
         /// <summary>
         /// parameter. Nullable.
         /// </summary>
+        [JsonProperty("parameter")]
         public string? Parameter { get; set; }
     }
 

@@ -144,6 +144,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             false
         );
 
+        Debug.Log("Remote SDP Run: " + JsonConvert.SerializeObject(options.extendedRtpCapabilities));
+
         _sendingRtpParametersByKind.Add("audio", ORTC.GetSendingRtpParameters(MediaKind.AUDIO, options.extendedRtpCapabilities));
         _sendingRtpParametersByKind.Add("video", ORTC.GetSendingRtpParameters(MediaKind.VIDEO, options.extendedRtpCapabilities));
 
@@ -308,6 +310,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         }
 
         RtpParameters sendingRtpParameters = Utils.Clone(_sendingRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
+        Debug.Log("Sending RTP Parameters: " + JsonConvert.SerializeObject(sendingRtpParameters));
         sendingRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRtpParameters.Codecs, options.codec);
 
         RtpParameters sendingRemoteRtpParameters = Utils.Clone(_sendingRemoteRtpParametersByKind![options.track.Kind.ToString().ToLower()]);

@@ -288,7 +288,6 @@ public class RemoteSdp
     {
         AnswerMediaSection mediaSection = new AnswerMediaSection(iceParameters, iceCandidates, dtlsParameters, sctpParameters, plainRtpParameters,
                                                     false, _offerMediaObject);
-
         AddMediaSection(mediaSection);
     }
 

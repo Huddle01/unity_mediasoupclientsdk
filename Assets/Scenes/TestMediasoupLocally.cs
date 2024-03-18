@@ -112,6 +112,7 @@ public class TestMediasoupLocally : MonoBehaviour
         Debug.Log($"receivedData: {receivedData}");
 
         RtpCapabilitiesObj = JsonConvert.DeserializeObject<RtpCapabilities>(receivedData);
+        Debug.Log("RTP Capabilites: " + JsonConvert.SerializeObject(RtpCapabilitiesObj));
         Debug.Log(RtpCapabilitiesObj.Codecs.Count);
     }
 
@@ -197,18 +198,13 @@ public class TestMediasoupLocally : MonoBehaviour
             Debug.Log("Send Transport starting to produce");
             //var parameters = (Tuple<TrackKind, RtpParameters, AppData>) ;
             TrackKind kind = (TrackKind) args[0];
-            Debug.Log($"Parameters: {kind.ToString()} }");
             RtpParameters rtpParameters = (RtpParameters) args[1];
-            Debug.Log($"Parameters: {kind.ToString()} , {rtpParameters.ToString()}");
-            AppData appData = (AppData) args[2];
-            Debug.Log($"Parameters: {kind.ToString()} , {rtpParameters.ToString()} {appData.ToString()}");
 
             var responseData = new
             {
                 transportId = SendTransport.id,
                 kind = kind == TrackKind.Audio ? "audio" : "video",
                 rtpParameters = rtpParameters,
-                appData = appData
             };
 
             var data = new { type = "transport-produce", data = responseData };
