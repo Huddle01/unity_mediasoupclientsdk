@@ -62,8 +62,8 @@ namespace Mediasoup.Transports
         Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
         ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new();
 
-        Task<Consumer<AppData>> ConsumeAsync<ConsumerAppData>(
-        ConsumerOptions options = null) where ConsumerAppData : AppData, new();
+        void ConsumeAsync<ConsumerAppData>(
+        ConsumerOptions options = null, Action<Consumer<AppData>> resultCallback = null) where ConsumerAppData : AppData, new();
 
         Task<DataProducer<AppData>> ProduceDataAsync<DataProducerAppData>(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback,
         DataProducerOptions options = null) where DataProducerAppData : AppData, new();
@@ -367,7 +367,8 @@ namespace Mediasoup.Transports
 
         }
 
-        public async Task<Consumer<AppData>> ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null) where ConsumerAppData : AppData, new()
+        public async void ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null,Action<Consumer<AppData>> resultCallback = null)
+                where ConsumerAppData : AppData, new()
         {
             if (isClosed)
             {
@@ -411,16 +412,13 @@ namespace Mediasoup.Transports
 
             if (isClosed)
             {
-                return null;
+                return;
             }
 
             if (!consumerCreationInProgress)
             {
-                await CreatePendingConsumer<ConsumerAppData>();
+                Task.Run(()=>CreatePendingConsumer<ConsumerAppData>(resultCallback));
             }
-
-
-            return await consumerCreationTask.Promise;
 
         }
 
@@ -556,118 +554,104 @@ namespace Mediasoup.Transports
             return dataConsumer;
         }
 
-        public async Task CreatePendingConsumer<ConsumerAppData>() where ConsumerAppData : AppData
+        public async Task CreatePendingConsumer<ConsumerAppData>(Action<Consumer<AppData>> resultCallback) where ConsumerAppData : AppData
         {
-            await awaitQueue.Push(async () =>
+            
+            if (pendingConsumerTasks.Count == 0)
             {
-                if (pendingConsumerTasks.Count == 0)
+                Debug.LogError("createPendingConsumers() | there is no Consumer to be created");
+            }
+
+            List<ConsumerCreationClass> tempPendingConsumerTask = new List<ConsumerCreationClass>(pendingConsumerTasks);
+            pendingConsumerTasks.Clear();
+
+            Consumer<AppData> videoConsumerForProbator = null;
+
+            List<HandlerReceiveOptions> optionsList = new List<HandlerReceiveOptions>();
+
+            foreach (ConsumerCreationClass task in tempPendingConsumerTask)
+            {
+                HandlerReceiveOptions tempOption = new HandlerReceiveOptions
                 {
-                    Debug.LogError("createPendingConsumers() | there is no Consumer to be created");
-                    return new object();
-                }
+                    kind = task.ConsumerOptions.kind,
+                    streamId = task.ConsumerOptions.streamId,
+                    rtpParameters = task.ConsumerOptions.rtpParameters,
+                    trackId = task.ConsumerOptions.id
+                };
 
+                optionsList.Add(tempOption);
+            }
 
-                List<ConsumerCreationClass> tempPendingConsumerTask = new List<ConsumerCreationClass>(pendingConsumerTasks);
-                pendingConsumerTasks.Clear();
+            try
+            {
+                List<HandlerReceiveResult> results = await handlerInterface.Receive(optionsList);
 
-                Consumer<AppData> videoConsumerForProbator = null;
-
-                List<HandlerReceiveOptions> optionsList = new List<HandlerReceiveOptions>();
-
-                foreach (ConsumerCreationClass task in tempPendingConsumerTask)
+                for (int i = 0; i < results.Count; i++)
                 {
-                    HandlerReceiveOptions tempOption = new HandlerReceiveOptions
+                    ConsumerCreationClass task = tempPendingConsumerTask[i];
+                    HandlerReceiveResult result = results[i];
+
+                    var tempId = task.ConsumerOptions.id;
+                    var tempProducerId = task.ConsumerOptions.producerId;
+                    var tempkind = task.ConsumerOptions.kind;
+                    var tempRtpParam = task.ConsumerOptions.rtpParameters;
+                    var tempAppData = task.ConsumerOptions.appData;
+
+                    var tempLocalId = result.localId;
+                    var tempRtpReceiver = result.rtpReceiver;
+                    var tempTrack = result.track;
+
+                    Consumer<AppData> tempConsumer = new Consumer<AppData>(tempId, tempLocalId, tempProducerId,
+                                                        tempRtpReceiver, tempTrack, tempRtpParam, tempAppData);
+
+                    consumers.Add(tempConsumer.id, tempConsumer);
+                    HandleConsumer(tempConsumer);
+
+                    if (!_probatorConsumerCreated && videoConsumerForProbator != null && tempkind == "video")
                     {
-                        kind = task.ConsumerOptions.kind,
-                        streamId = task.ConsumerOptions.streamId,
-                        rtpParameters = task.ConsumerOptions.rtpParameters,
-                        trackId = task.ConsumerOptions.id
-                    };
+                        videoConsumerForProbator = tempConsumer;
+                    }
 
-                    optionsList.Add(tempOption);
+                    _ = observer.SafeEmit("newconsumer", tempConsumer);
+
+                    task.ResolveConsumer(tempConsumer);
+                    resultCallback.Invoke(tempConsumer);
+
                 }
 
+            }
+            catch (Exception ex)
+            {
+                foreach (var task in pendingConsumerTasks)
+                {
+                    task.RejectWithError(new Exception("Rejecting consumer"));
+                }
+            }
+
+            if (videoConsumerForProbator != null)
+            {
                 try
                 {
-                    List<HandlerReceiveResult> results = await handlerInterface.Receive(optionsList);
+                    var probatorRtpParameters = ORTC.GenerateProbatorRtpParameters(videoConsumerForProbator.rtpParameters);
 
-                    for (int i = 0; i < results.Count; i++)
+                    _ = await handlerInterface.Receive(new List<HandlerReceiveOptions>
                     {
-                        ConsumerCreationClass task = tempPendingConsumerTask[i];
-                        HandlerReceiveResult result = results[i];
-
-                        var tempId = task.ConsumerOptions.id;
-                        var tempProducerId = task.ConsumerOptions.producerId;
-                        var tempkind = task.ConsumerOptions.kind;
-                        var tempRtpParam = task.ConsumerOptions.rtpParameters;
-                        var tempAppData = task.ConsumerOptions.appData;
-
-                        var tempLocalId = result.localId;
-                        var tempRtpReceiver = result.rtpReceiver;
-                        var tempTrack = result.track;
-
-                        Consumer<AppData> tempConsumer = new Consumer<AppData>(tempId, tempLocalId, tempProducerId,
-                                                            tempRtpReceiver, tempTrack, tempRtpParam, tempAppData);
-
-                        consumers.Add(tempConsumer.id, tempConsumer);
-                        HandleConsumer(tempConsumer);
-
-                        if (!_probatorConsumerCreated && videoConsumerForProbator != null && tempkind == "video")
+                        new HandlerReceiveOptions
                         {
-                            videoConsumerForProbator = tempConsumer;
+                            trackId = "probator",
+                            kind = "video",
+                            rtpParameters = probatorRtpParameters
                         }
+                    });
 
-                        _ = observer.SafeEmit("newconsumer", tempConsumer);
-
-                        task.ResolveConsumer(tempConsumer);
-
-                    }
+                    _probatorConsumerCreated = true;
 
                 }
                 catch (Exception ex)
                 {
-                    foreach (var task in pendingConsumerTasks)
-                    {
-                        task.RejectWithError(new Exception("Rejecting consumer"));
-                    }
+                    throw new Exception("createPendingConsumers() | failed to create Consumer for RTP probation");
                 }
-
-                if (videoConsumerForProbator != null)
-                {
-                    try
-                    {
-                        var probatorRtpParameters = ORTC.GenerateProbatorRtpParameters(videoConsumerForProbator.rtpParameters);
-
-                        _ = await handlerInterface.Receive(new List<HandlerReceiveOptions>
-                        {
-                            new HandlerReceiveOptions
-                            {
-                                trackId = "probator",
-                                kind = "video",
-                                rtpParameters = probatorRtpParameters
-                            }
-                        });
-
-                        _probatorConsumerCreated = true;
-
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new Exception("createPendingConsumers() | failed to create Consumer for RTP probation");
-                    }
-                }
-
-                return new object();
-            }, "transport.produceData()").ContinueWith(task =>
-            {
-                consumerCreationInProgress = false;
-
-                if (pendingConsumerTasks.Count > 0)
-                {
-                    CreatePendingConsumer<AppData>();
-                }
-
-            });
+            }
         }
 
         public async Task PausePendingConsumers()

@@ -306,9 +306,6 @@ public class TestMediasoupLocally : MonoBehaviour
             parameters.Item2?.Invoke();
 
         });
-
-
-
     }
 
     public async void ConnectRevcTransportAndConsume()
@@ -324,6 +321,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
         var data = new { type = "consume", data = responsePayload };
 
+        Debug.Log(JsonConvert.SerializeObject(data));
         var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
         await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
 
@@ -349,7 +347,13 @@ public class TestMediasoupLocally : MonoBehaviour
 
         Debug.Log("Create Consumer Obj");
 
-        ConsumerObj = await ReceiveTransport.ConsumeAsync<AppData>();
+        ReceiveTransport.ConsumeAsync<AppData>(options, HandleConsumer);
+    }
+
+    private void HandleConsumer(Consumer<AppData> consumer) 
+    {
+        Debug.Log("Consumer Creation Done");
+        ConsumerObj = consumer;
 
         VideoStreamTrack track = ConsumerObj.track as VideoStreamTrack;
 
@@ -357,7 +361,6 @@ public class TestMediasoupLocally : MonoBehaviour
         {
             _remoteVideoSource.texture = tex;
         };
-
     }
 
     private IEnumerator CaptureWebCamVideo()

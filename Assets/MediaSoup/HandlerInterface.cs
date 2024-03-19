@@ -174,6 +174,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         pc.OnConnectionStateChange += (state) =>
         {
+            Debug.Log($"connectionstatechange to {state.ToString()}");
             _ = Emit("@connectionstatechange", state);
         };
 
