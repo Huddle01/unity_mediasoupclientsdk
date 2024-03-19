@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Mediasoup.RtpParameter;
+using Newtonsoft.Json;
 
 namespace Mediasoup.RtpParameter
 {
@@ -14,11 +15,13 @@ namespace Mediasoup.RtpParameter
         /// <summary>
         /// Supported media and RTX codecs.
         /// </summary>
+        [JsonProperty("codecs")]
         public List<RtpCodecCapability>? Codecs { get; set; } = new List<RtpCodecCapability>();
 
         /// <summary>
         /// Supported RTP header extensions.
         /// </summary>
+        [JsonProperty("headerExtensions")]
         public  List<RtpHeaderExtension>? HeaderExtensions { get; set; } = new List<RtpHeaderExtension>();
 
         /// <summary>

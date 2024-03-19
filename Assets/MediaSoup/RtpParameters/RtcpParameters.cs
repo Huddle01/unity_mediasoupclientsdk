@@ -18,12 +18,14 @@ namespace Mediasoup.RtpParameter {
         /// <summary>
         /// The Canonical Name (CNAME) used by RTCP (e.g. in SDES messages).
         /// </summary>
+        [JsonProperty("cname")]
         public string? CNAME { get; set; }
 
         /// <summary>
         /// Whether reduced size RTCP RFC 5506 is configured (if true) or compound RTCP
         /// as specified in RFC 3550 (if false). Default true.
         /// </summary>
+        [JsonProperty("reducedSize")]
         public bool? ReducedSize { get; set; } = true;
     }
 }

@@ -71,7 +71,7 @@ public class TestMediasoupLocally : MonoBehaviour
                         },
 
             codecOptions = { videoGoogleStartBitrate = 1000 },
-            codec = { MimeType = "video/VP8", ClockRate = 90000 },
+            codec = { Kind = MediaKind.VIDEO, MimeType = "video/VP8", ClockRate = 90000, PreferredPayloadType = 127 , Parameters = new Dictionary<string, object>() { { "x-google-start-bitrate", 1000} } },
         };
 
         _websocket = new ClientWebSocket();
@@ -254,7 +254,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
         var jsonParsed = JObject.Parse(receivedMessage);
 
-        string id = (string)jsonParsed["id"];
+        string id = (string)jsonParsed["data"]["id"];
 
         IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>(jsonParsed["data"]["iceParameters"].ToString());
 
@@ -282,29 +282,37 @@ public class TestMediasoupLocally : MonoBehaviour
         ReceiveTransport = DeviceObj.CreateRecvTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
                                                 iceTransportPolicy, additionalSettings, proprietaryConstraints, appData);
 
+        Debug.Log("Recv transport connected");
+
 
         ReceiveTransport.On("connect", async (args) =>
         {
-            var parameters = (Tuple<DtlsParameters, Action, Action<string>>)args[0];
-            DtlsParameters dtlsParams = parameters.Item1;
+            Debug.Log("Receive Transport connected");
+            DtlsParameters dtlsParameters = (DtlsParameters)args[0];
+            Action callBack = (Action)args[1];
+            Action<Exception> errBack = (Action<Exception>)args[2];
 
-            var responseData = new Dictionary<string, object>
+            try
             {
-                { "transportId", ReceiveTransport.id },
-                { "dtlsParameters", dtlsParams}
+                var responseData = new Dictionary<string, object>
+            {
+                { "transportId", SendTransport.id },
+                { "dtlsParameters", dtlsParameters}
             };
 
-            //convert disctionary to json
-            string responsePayload = JsonConvert.SerializeObject(responseData);
 
-            var data = new { type = "transport-recv-connect", data = responsePayload };
+                var data = new { type = "transport-recv-connect", data = responseData };
 
-            var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+                var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
 
-            await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
+                await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
 
-            parameters.Item2?.Invoke();
-
+                callBack();
+            }
+            catch (Exception ex)
+            {
+                errBack(ex);
+            }
         });
     }
 
@@ -312,36 +320,41 @@ public class TestMediasoupLocally : MonoBehaviour
     {
         Debug.Log("ConnectRevcTransportAndConsume()");
 
-        var responseData = new Dictionary<string, object>
+        var responseData = new
         {
-            { "rtpCapabilities", DeviceObj.GetRtpCapabilities() }
+            rtpCapabilities = DeviceObj.GetRtpCapabilities()
         };
 
-        string responsePayload = JsonConvert.SerializeObject(responseData);
-
-        var data = new { type = "consume", data = responsePayload };
+        var data = new { type = "consume", data = responseData };
 
         Debug.Log(JsonConvert.SerializeObject(data));
         var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
         await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
 
         string receivedMessage = await ReceiveMessage(_websocket);
+        Debug.Log($"Received: {receivedMessage}");
 
         if (string.IsNullOrEmpty(receivedMessage)) return;
 
-        var jsonParsed = JObject.Parse(receivedMessage);
+        var jsonParsed = JObject.Parse(receivedMessage)["data"]["params"];
 
+        string id = (string) jsonParsed["id"];
+        string producerId = (string) jsonParsed["producerId"];
+        string mediaKind = (string) jsonParsed["kind"];
 
-        string id = (string)jsonParsed["id"];
-        string producerId = (string)jsonParsed["producerId"];
-        string mediaKind = (string)jsonParsed["kind"];
-        RtpParameters rtpParameters = JsonConvert.DeserializeObject<RtpParameters>((string)jsonParsed["rtpParameters"]);
+        Debug.Log($"id {id}, producerId: {producerId}, mediaKind: {mediaKind}");
+
+        Debug.Log($"RtpParameters: {jsonParsed["rtpParameters"].ToString()}");
+
+        RtpParameters rtpParameters = JsonConvert.DeserializeObject<RtpParameters>(jsonParsed["rtpParameters"].ToString());
+
+        Debug.Log($"id: {id}, producerId: {producerId}, mediaKind: {mediaKind}, rtpParameters: {JsonConvert.SerializeObject(rtpParameters)}");
 
         ConsumerOptions options = new ConsumerOptions
         {
             id = id,
             producerId = producerId,
-            kind = mediaKind,
+            kind = mediaKind.Trim().ToLower(),
             rtpParameters = rtpParameters
         };
 

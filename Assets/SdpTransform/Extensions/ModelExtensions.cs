@@ -277,7 +277,9 @@ namespace Utilme.SdpTransform
             // Media description fields.
             foreach (var md in sdp.MediaDescriptions)
             {
-                sb.Append(md.ToText());
+                string mdText = md.ToText();
+                sb.Append(mdText);
+                Debug.Log("MdText: " + mdText);
 
                 if (md.Information is not null)
                     sb.Append(md.Information.ToInformationText());

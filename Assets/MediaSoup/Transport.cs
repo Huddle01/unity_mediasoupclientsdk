@@ -110,7 +110,7 @@ namespace Mediasoup.Transports
 
         public bool _probatorConsumerCreated { get; private set; }
 
-        public List<ConsumerCreationClass> pendingConsumerTasks { get; private set; }
+        public List<ConsumerCreationClass> pendingConsumerTasks { get; private set; } = new();
 
         public bool consumerCreationInProgress { get; private set; }
 
@@ -345,25 +345,25 @@ namespace Mediasoup.Transports
 
             Producer<ProducerAppData> tempproducer = null;
 
-            
-                ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
-                _ = await SafeEmit("produce", options.track.Kind, handlerSendResult.rtpParameters);
 
-                //Adding a func param so that a method can be injected which can provide producer id
-                string num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters, appData);
+            ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
+            _ = await SafeEmit("produce", options.track.Kind, handlerSendResult.rtpParameters);
 
-                tempproducer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId,
-                    handlerSendResult.rtpSender, options.track, handlerSendResult.rtpParameters, options.stopTracks,
-                    options.disableTrackOnPause, options.zeroRtpOnPause, options.appData);
+            //Adding a func param so that a method can be injected which can provide producer id
+            string num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters, appData);
 
-                producers.Add(tempproducer.id, tempproducer);
-                HandleProducer(tempproducer);
+            tempproducer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId,
+                handlerSendResult.rtpSender, options.track, handlerSendResult.rtpParameters, options.stopTracks,
+                options.disableTrackOnPause, options.zeroRtpOnPause, options.appData);
 
-                Debug.Log($"Return Producer async");
+            producers.Add(tempproducer.id, tempproducer);
+            HandleProducer(tempproducer);
 
-                _ = await observer.SafeEmit("newproducer", tempproducer);
-                return tempproducer;
-            
+            Debug.Log($"Return Producer async");
+
+            _ = await observer.SafeEmit("newproducer", tempproducer);
+            return tempproducer;
+
 
         }
 
@@ -386,7 +386,7 @@ namespace Mediasoup.Transports
             {
                 throw new ArgumentNullException("missing producer id");
             }
-            else if (options.kind != "audio" || options.kind != "video")
+            else if (options.kind != "audio" && options.kind != "video")
             {
                 throw new ArgumentNullException("unsupported media kind");
             }
@@ -786,11 +786,11 @@ namespace Mediasoup.Transports
             handlerInterface.On("@connect", async (args) =>
             {
                 Debug.Log("Received @connect event");
-                DtlsParameters dtlsParams = (DtlsParameters) args[0];
+                DtlsParameters dtlsParams = (DtlsParameters)args[0];
                 Debug.Log("DTLS Parameters " + dtlsParams.ToString());
-                Action connectCallback = (Action) args[1];
+                Action connectCallback = (Action)args[1];
                 Debug.Log("Connect call back " + connectCallback.ToString());
-                Action<Exception> connectErrback = (Action<Exception>) args[2];
+                Action<Exception> connectErrback = (Action<Exception>)args[2];
                 Debug.Log("Err call back " + connectErrback.ToString());
 
                 Debug.Log("Is Closed: " + isClosed.ToString());

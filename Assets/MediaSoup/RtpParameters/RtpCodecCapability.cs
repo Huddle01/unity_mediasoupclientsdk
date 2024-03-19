@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 
@@ -31,16 +32,19 @@ namespace Mediasoup.RtpParameter
         /// <summary>
         /// Media kind.
         /// </summary>
+        [JsonProperty("kind")]
         public MediaKind Kind { get; set; }
 
         /// <summary>
         /// The preferred RTP payload type.
         /// </summary>
+        [JsonProperty("preferredPayloadType")]
         public byte? PreferredPayloadType { get; set; }
 
         /// <summary>
         /// Transport layer and codec-specific feedback messages for this codec.
         /// </summary>
+        [JsonProperty("rtcpFeedback")]
         public List<RtcpFeedback> RtcpFeedback { get; set; }
     }
 }

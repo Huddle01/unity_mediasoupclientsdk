@@ -75,7 +75,7 @@ namespace Mediasoup
             recvRtpCapabilities = ORTC.GetRecvRtpCapabilities(extendedRtpCapabilities);
 
 
-            Console.WriteLine("Got Recieve RTP Capabilities: ", JsonConvert.SerializeObject(recvRtpCapabilities));
+            UnityEngine.Debug.Log("Got Recieve RTP Capabilities: " + JsonConvert.SerializeObject(recvRtpCapabilities));
 
             // This may throw
             ORTC.ValidateRtpCapabilities(recvRtpCapabilities);
@@ -85,7 +85,7 @@ namespace Mediasoup
             // This may throw
             ORTC.ValidateSctpCapabilities(sctpCapabilities);
 
-            Console.WriteLine("Loaded");
+            UnityEngine.Debug.Log("Loaded");
         }
 
         public bool CanProduce(MediaKind kind) 
