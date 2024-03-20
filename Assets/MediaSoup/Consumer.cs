@@ -57,6 +57,8 @@ namespace Mediasoup
 
             if (_appData != null) appData = _appData ?? typeof(TConsumerAppData).New<TConsumerAppData>()!;
 
+            UnityEngine.Debug.Log($"Creating Consume for producer id {_producerId} and track {_track.Id}");
+
             observer = new EnhancedEventEmitter<ConsumerObserverEvents>();
         }
 

@@ -106,7 +106,7 @@ public class RemoteSdp
 
             //Debug.Log($"Fingerprint Algorithm: ${fingerPrint.HashFunction.ToString()}, Hash Value: {fingerPrint.HashValue}");
 
-            sdpObject.Attributes.Group = new Group 
+            sdpObject.Attributes.Group = new Group
             {
                 Semantics = GroupSemantics.Bundle,
                 // TODO: Check this parameter
@@ -129,7 +129,7 @@ public class RemoteSdp
             }
         }
 
-        Debug.Log($"Final Remote SDP object: { sdpObject.ToText()}");
+        Debug.Log($"Final Remote SDP object: {sdpObject.ToText()}");
 
     }
 
@@ -149,20 +149,20 @@ public class RemoteSdp
     public void UpdateDtlsRole(DtlsRole _dtlsRole)
     {
         if (dtlsParameters != null) dtlsParameters.role = _dtlsRole;
-        
+
         foreach (var item in mediaSections)
         {
             item.SetDtlsRole(_dtlsRole);
         }
     }
 
-    public Tuple<int, string> GetNextMediaSectionIdx() 
+    public Tuple<int, string> GetNextMediaSectionIdx()
     {
         for (int idx = 0; idx < mediaSections.Count; idx++)
         {
             MediaSection tempMediaSection = mediaSections[idx];
 
-            if (tempMediaSection.isClosed) 
+            if (tempMediaSection.isClosed)
             {
                 return Tuple.Create(idx, tempMediaSection.mid);
             }
@@ -172,39 +172,46 @@ public class RemoteSdp
         return Tuple.Create(mediaSections.Count, "");
     }
 
-    public void Send(object _offerMediaObject,string _resuedMid,RtpParameters _offerRtp, RtpParameters _answerRtp,
-                        ProducerCodecOptions _codecOptions,bool _extmapAllowMixed) 
+    public void Send(object _offerMediaObject, string _resuedMid, RtpParameters _offerRtp, RtpParameters _answerRtp,
+                        ProducerCodecOptions _codecOptions, bool _extmapAllowMixed)
     {
-        AnswerMediaSection asnwerMediaSection = new AnswerMediaSection(iceParameters,iceCandidates,dtlsParameters,null,plainRtpParameters,
-                                                    planB,_offerMediaObject,_offerRtp,_answerRtp,_codecOptions,_extmapAllowMixed);
+        AnswerMediaSection asnwerMediaSection = new AnswerMediaSection(iceParameters, iceCandidates, dtlsParameters, null, plainRtpParameters,
+                                                    planB, _offerMediaObject, _offerRtp, _answerRtp, _codecOptions, _extmapAllowMixed);
         Debug.Log(_resuedMid);
+        Debug.Log("RemoteSDP | Receive() | Answer media section: " + string.Join(" ", asnwerMediaSection._mediaObject.Fmts));
         if (!string.IsNullOrEmpty(_resuedMid))
         {
             ReplaceMediaSection(asnwerMediaSection, _resuedMid);
-        } else if (!midToIndex.ContainsKey(asnwerMediaSection.mid))
+        }
+        else if (!midToIndex.ContainsKey(asnwerMediaSection.mid))
         {
             AddMediaSection(asnwerMediaSection);
         }
-        else 
+        else
         {
             ReplaceMediaSection(asnwerMediaSection);
         }
     }
 
-    public void Receive(string _mid,MediaKind _mediaKind, RtpParameters _offerRtp,string _streamId,string _trackId) 
+    public void Receive(string _mid, MediaKind _mediaKind, RtpParameters _offerRtp, string _streamId, string _trackId)
     {
         OfferMediaSection offerMediaSection = null;
+        Debug.Log("RemoteSDP | Receive() | ");
 
         int idx = -1;
-        if (midToIndex.TryGetValue(_mid, out idx)) 
+        if (midToIndex.TryGetValue(_mid, out idx))
         {
             offerMediaSection = mediaSections[idx] as OfferMediaSection;
+            Debug.Log("RemoteSDP | Receive() | offerMediaSection: " + offerMediaSection.ToString());
         }
 
         if (offerMediaSection == null)
         {
+            Debug.Log("RemoteSDP | Receive() | Generating Offer MEdia ");
             offerMediaSection = new OfferMediaSection(iceParameters, iceCandidates, dtlsParameters, null, plainRtpParameters, planB,
                                                         _mid, _mediaKind, _offerRtp, _streamId, _trackId);
+
+            Debug.Log("RemoteSDP | Receive() | Generated Media Section: " + string.Join(" ", offerMediaSection._mediaObject.Fmts.ToArray()));
 
             // Let's try to recycle a closed media section (if any).
             // NOTE: Yes, we can recycle a closed m=audio section with a new m=video.
@@ -212,23 +219,26 @@ public class RemoteSdp
 
             if (oldMediaSection != null)
             {
+                Debug.Log("RemoteSDP | Receive() | ");
                 ReplaceMediaSection(offerMediaSection, oldMediaSection.mid);
             }
             else
             {
+                Debug.Log("RemoteSDP | Receive() | ");
                 AddMediaSection(offerMediaSection);
             }
 
         }
         else // Plan-B.
         {
-            offerMediaSection.PlanBReceive(_offerRtp,_streamId,_trackId);
+            Debug.Log("RemoteSDP | Receive() | ");
+            offerMediaSection.PlanBReceive(_offerRtp, _streamId, _trackId);
             ReplaceMediaSection(offerMediaSection);
         }
 
     }
 
-    public void PauseMediaSection(string _mid) 
+    public void PauseMediaSection(string _mid)
     {
         MediaSection mediaSection = FindMediaSection(_mid);
         mediaSection.Pause();
@@ -256,7 +266,7 @@ public class RemoteSdp
     {
         MediaSection mediaSection = FindMediaSection(_mid);
 
-        if (_mid == firstMid) 
+        if (_mid == firstMid)
         {
             Debug.Log($"closeMediaSection() | cannot close first media section, disabling it instead {_mid}");
             DisableMediaSection(_mid);
@@ -270,36 +280,36 @@ public class RemoteSdp
 
     }
 
-    public void MuxMediaSectionSimulcast(string _mid,List<RTCRtpEncodingParameters> _encodings) 
+    public void MuxMediaSectionSimulcast(string _mid, List<RTCRtpEncodingParameters> _encodings)
     {
         AnswerMediaSection mediaSection = FindMediaSection(_mid) as AnswerMediaSection;
         mediaSection.MuxSimulcastStreams(_encodings);
         ReplaceMediaSection(mediaSection);
     }
 
-    public void PlanBStopReceiving(string _mid,RtpParameters _offerRtp) 
+    public void PlanBStopReceiving(string _mid, RtpParameters _offerRtp)
     {
         OfferMediaSection mediaSection = FindMediaSection(_mid) as OfferMediaSection;
         mediaSection.PlanBStopReceiving(_offerRtp);
         ReplaceMediaSection(mediaSection);
     }
 
-    public void SendSctpAssociation(object _offerMediaObject) 
+    public void SendSctpAssociation(object _offerMediaObject)
     {
         AnswerMediaSection mediaSection = new AnswerMediaSection(iceParameters, iceCandidates, dtlsParameters, sctpParameters, plainRtpParameters,
                                                     false, _offerMediaObject);
         AddMediaSection(mediaSection);
     }
 
-    public void ReceiveSctpAssociation(bool _oldDataChannelSpec) 
+    public void ReceiveSctpAssociation(bool _oldDataChannelSpec)
     {
         OfferMediaSection mediaSection = new OfferMediaSection(iceParameters, iceCandidates, dtlsParameters, sctpParameters, plainRtpParameters,
-                                                        false, "datachannel",MediaKind.APPLICATION,null,null,null, _oldDataChannelSpec);
+                                                        false, "datachannel", MediaKind.APPLICATION, null, null, null, _oldDataChannelSpec);
 
         AddMediaSection(mediaSection);
     }
 
-    public string GetSdp() 
+    public string GetSdp()
     {
         sdpObject.Origin.SessionVersion++;
         return sdpObject.ToText();
@@ -336,7 +346,7 @@ public class RemoteSdp
 
             // Update the map.
             midToIndex.Remove(oldMediaSection.mid);
-            midToIndex.Add(_newMediaSection.mid,idx);
+            midToIndex.Add(_newMediaSection.mid, idx);
 
             // Update the SDP object.
             sdpObject.MediaDescriptions[idx] = _newMediaSection.GetObject();
@@ -345,7 +355,7 @@ public class RemoteSdp
             RegenerateBundleMids();
 
         }
-        else 
+        else
         {
             int idx = -1;
 
@@ -376,7 +386,7 @@ public class RemoteSdp
     {
         if (dtlsParameters == null) return;
 
-        if (sdpObject.Attributes.Group.SemanticsExtensions!=null && sdpObject.Attributes.Group.SemanticsExtensions.Length > 0)
+        if (sdpObject.Attributes.Group.SemanticsExtensions != null && sdpObject.Attributes.Group.SemanticsExtensions.Length > 0)
         {
             sdpObject.Attributes.Group.SemanticsExtensions[0] = string.Join(' ', mediaSections
                 .Where(mediaSection => !mediaSection.isClosed)

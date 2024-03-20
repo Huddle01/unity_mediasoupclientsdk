@@ -7,22 +7,13 @@ using Mediasoup.SctpParameter;
 using Mediasoup.Transports;
 using System.Threading.Tasks;
 using System;
-using UnityAsyncAwaitUtil;
 using Utilme.SdpTransform;
 using Mediasoup.Ortc;
 using Mediasoup.Internal;
 using Mediasoup;
 using System.Linq;
-using System.Data;
 using Newtonsoft.Json;
-using static System.Net.WebRequestMethods;
-using static UnityEngine.Rendering.VirtualTexturing.Debugging;
-using System.Drawing;
-using System.IO;
-using System.Security.Cryptography;
-using System.Security.Policy;
-using Unity.VisualScripting;
-using UnityEditor.PackageManager;
+using Cysharp.Threading.Tasks;
 
 public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 {
@@ -239,7 +230,10 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
                 sdp = remoteSdp.GetSdp()
             };
 
-            _ = await SetRemoteDescriptionAsync(pc, sessionDescription);
+            var iceRestartOP = await SetRemoteDescriptionAsync(pc, sessionDescription);
+
+            Debug.Log($"Is IceRestart Completed: {iceRestartOP.IsDone}, Error: {(iceRestartOP.IsError ? iceRestartOP.Error : "No Error")}");
+            Debug.Log($"PC SignalingState State ${pc.SignalingState}");
 
         }
         else
@@ -258,7 +252,10 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
                 sdp = remoteSdp.GetSdp()
             };
 
-            _ = await SetLocalDescriptionAsync(pc, offerDesc);
+            var iceRestartOP = await SetLocalDescriptionAsync(pc, offerDesc);
+
+            Debug.Log($"Is IceRestart Completed: {iceRestartOP.IsDone}, Error: {(iceRestartOP.IsError ? iceRestartOP.Error : "No Error")}");
+            Debug.Log($"PC SignalingState State ${pc.SignalingState}");
 
         }
 
@@ -343,7 +340,11 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         Debug.Log($"SetLocalDescriptionAsync");
 
-        _ = await SetLocalDescriptionAsync(pc, offer.Desc);
+        var localDescSetupOp = await SetLocalDescriptionAsync(pc, offer.Desc);
+
+        Debug.Log($"LocalDescSetupOp complete: {localDescSetupOp.IsDone}");
+
+        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
 
         // We can now get the transceiver.mid.
         string localId = transceiver.Mid;
@@ -352,6 +353,9 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         localSdp = pc.LocalDescription.sdp.ToSdp();
 
+
+        Debug.Log($"PC State: {pc.SignalingState.ToString()}");
+
         MediaDescription offerMediaObject = localSdp.MediaDescriptions[mediaSectionIdx.Item1];
 
         // Set RTCP CNAME.
@@ -359,6 +363,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         {
             sendingRtpParameters.Rtcp.CNAME = CommonUtils.GetCName(offerMediaObject);
         }
+
+        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
 
         // Set RTP encodings by parsing the SDP offer if no encodings are given.
         if (options.encodings == null)
@@ -377,22 +383,28 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         {
             sendingRtpParameters.Encodings = options.encodings;
         }
+
         remoteSdp.Send(offerMediaObject, mediaSectionIdx.Item2, sendingRtpParameters, sendingRemoteRtpParameters, options.codecOptions, true);
+
+        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
+
         RTCSessionDescription sessionDescription = new RTCSessionDescription
         {
             type = RTCSdpType.Answer,
-            //sdp = "v=0\r\no=mediasoup-client 10000 1 IN IP4 0.0.0.0\r\ns=-\r\nt=0 0\r\na=ice-lite\r\na=fingerprint:sha-224 32:B1:E8:08:ED:32:8A:F2:E7:93:19:49:79:C9:62:84:8F:9A:A4:52:49:89:C8:D5:C5:46:B9:0B\r\na=msid-semantic: WMS *\r\na=group:BUNDLE 0\r\nm=video 7 UDP/TLS/RTP/SAVPF 96 97\r\nc=IN IP4 127.0.0.1\r\na=rtpmap:96 VP8/90000\r\na=rtpmap:97 rtx/90000\r\na=fmtp:96 x-google-start-bitrate=1000\r\na=fmtp:97 apt=96\r\na=rtcp-fb:96 transport-cc \r\na=rtcp-fb:96 ccm fir\r\na=rtcp-fb:96 nack \r\na=rtcp-fb:96 nack pli\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id\r\na=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\r\na=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\na=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01\r\na=extmap:13 urn:3gpp:video-orientation\r\na=extmap:14 urn:ietf:params:rtp-hdrext:toffset\r\na=setup:passive\r\na=mid:0\r\na=recvonly\r\na=ice-ufrag:c318rhq8a4f81m5lhke5gmf5b9wdmf2m\r\na=ice-pwd:qd36x7ke8i5ebgvn3qsvag5n1fyfgx04\r\na=candidate:udpcandidate 1 udp 1076302079 127.0.0.1 2007 typ host\r\na=candidate:tcpcandidate 1 tcp 1076276479 127.0.0.1 2015 typ host tcptype passive\r\na=end-of-candidates\r\na=ice-options:renomination\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rid:r0 recv\r\na=rid:r1 recv\r\na=rid:r2 recv\r\na=simulcast:recv r0;r1;r2\r\n"
             sdp = remoteSdp.GetSdp()
-            //sdp = "v=0\r\no=mediasoup-client 10000 1 IN IP4 0.0.0.0\r\ns=-\r\nt=0 -59926608000\r\na=group:BUNDLE 0\r\na=msid-semantic:WMS * \r\na=fingerprint:sha-224 44:34:3A:36:34:3A:45:38:3A:30:39:3A:38:34:3A:34:34:3A:36:38:3A:39:30:3A:45:32:3A:41:46:3A:42:39:3A:37:33:3A:41:32:3A:38:46:3A:35:46:3A:31:36:3A:39:46:3A:37:38:3A:42:35:3A:45:30:3A:45:42:3A:38:32:3A:46:37:3A:33:46:3A:31:42:3A:44:37:3A:46:38:3A:46:42\r\nm=video 7  \r\nc=IN IP4 127.0.0.0\r\na=mid:0\r\na=ice-ufrag:pz4u4udq30fzzus72opj9nqrk5kgkblk\r\na=ice-pwd:n9mgy47chyhtl4ih06ftv1gdm3yeahbu\r\na=ice-options:renomination\r\na=setup:active\r\na=simulcast:recv ~1;~2;~3\r\na=candidate:udpcandidate 1 udp 1076302079 127.0.0.1 2002 typ host\r\na=candidate:tcpcandidate 1 tcp 1076276479 127.0.0.1 2002 typ host\r\na=rid:r1 recv \r\na=rid:r2 recv \r\na=rid:r3 recv \r\na=rtpmap:101 VP8/90000\r\na=fmtp:101 ;x-google-start-bitrate=1000\r\na=extmap:12 urn:ietf:params:rtp-hdrext:toffset \r\na=extmap:4 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time \r\na=extmap:11 urn:3gpp:video-orientation \r\na=extmap:5 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01 \r\na=extmap:1 urn:ietf:params:rtp-hdrext:sdes:mid \r\na=extmap:2 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id \r\na=extmap:3 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\r\n"
-            //sdp = "v=0\r\no=mediasoup-client 10000 1 IN IP4 0.0.0.0\r\ns=-\r\nt=2208988800 2208988800\r\na=ice-lite\r\na=group:BUNDLE 0\r\na=msid-semantic:WMS * \r\na=fingerprint:sha-224 53:EC:0A:3A:EE:94:5A:00:7E:19:99:8D:B4:AB:68:39:95:04:E0:B8:59:AA:5F:C4:5E:A7:30:E5\r\nm=video 7 UDP/TLS/RTP/SAVPF 101\r\nc=IN IP4 127.0.0.0\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=recvonly\r\na=mid:0\r\na=ice-ufrag:1ofl6k64jodu511k2p06rlvp8x2nimax\r\na=ice-pwd:j6hzoy8yxybkfzzy8jakpjtjenwd48kf\r\na=ice-options:renomination\r\na=setup:active\r\na=simulcast:recv ~1;~2;~3\r\na=candidate:udpcandidate 1 udp 1076302079 127.0.0.1 2005 typ host\r\na=candidate:tcpcandidate 1 tcp 1076276479 127.0.0.1 2018 typ host tcptype passive\r\na=rid:1 recv \r\na=rid:2 recv \r\na=rid:3 recv \r\na=rtpmap:101 VP8/90000\r\na=fmtp:101 ;implementation_name=Internal;x-google-start-bitrate=1000\r\na=extmap:12 urn:ietf:params:rtp-hdrext:toffset \r\na=extmap:4 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time \r\na=extmap:11 urn:3gpp:video-orientation \r\na=extmap:5 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01 \r\na=extmap:1 urn:ietf:params:rtp-hdrext:sdes:mid \r\na=extmap:2 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id \r\na=extmap:3 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\r\n"
         };
-        Debug.Log(remoteSdp.GetSdp());
 
+        Debug.Log("Remote SDP: " + remoteSdp.GetSdp());
 
         Debug.Log($"Session Description: {sessionDescription.sdp}");
+        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
         //Debug.Log($"Media FMts: {remoteSdp}");
 
-        _ = await SetRemoteDescriptionAsync(pc, sessionDescription);
+        var remoteSdbSetupOp = await SetRemoteDescriptionAsync(pc, sessionDescription);
+
+        Debug.Log($"remoteSdbSetupOp complete: {remoteSdbSetupOp.IsDone}, Error: {(remoteSdbSetupOp.IsError ? remoteSdbSetupOp.Error.ToString() : "No Error")}");
+
+        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
 
         // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
@@ -613,12 +625,15 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         Dictionary<string, string> mapLocalId = new Dictionary<string, string>();
         foreach (HandlerReceiveOptions options in optionsList)
         {
-            var trackId = options.trackId;
-            var kind = options.kind;
-            var rtpParameters = options.rtpParameters;
-            var streamId = options.streamId;
+            string trackId = options.trackId;
+            string kind = options.kind;
+            RtpParameters rtpParameters = options.rtpParameters;
+
+            Debug.Log("Handler | Receive() | Option.RtpParameters: " + JsonConvert.SerializeObject(rtpParameters));
+
+            string streamId = options.streamId;
             Debug.Log($"receive() [trackId:{trackId}, kind:{kind}]");
-            var localId = rtpParameters.Mid ?? this._mapMidTransceiver.Count.ToString();
+            string localId = rtpParameters.Mid ?? _mapMidTransceiver.Count.ToString();
             mapLocalId.Add(trackId, localId);
             MediaKind mediaKind = MediaKind.AUDIO;
             if (kind.Contains("vi"))
@@ -629,19 +644,39 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             {
                 mediaKind = MediaKind.APPLICATION;
             }
-            remoteSdp.Receive(localId, mediaKind, rtpParameters,
-            streamId ?? rtpParameters.Rtcp.CNAME ?? string.Empty,
-            trackId
-            );
+            remoteSdp.Receive(localId, mediaKind, rtpParameters, streamId ?? rtpParameters.Rtcp.CNAME ?? string.Empty, trackId);
         }
+
+        Debug.Log($"Generating Offer for SDP: {remoteSdp.GetSdp()}");
+
+
         RTCSessionDescription offer = new RTCSessionDescription
         {
             type = RTCSdpType.Offer,
             sdp = remoteSdp.GetSdp()
         };
-        _ = await SetRemoteDescriptionAsync(pc, offer);
+
+        Debug.Log($"Receive() | Setting Remote Description {remoteSdp.GetSdp()}");
+
+        //Debug.Log($"Receive | SDP Offer: {offer.GetStringValue()}");
+
+
+        Debug.Log("Peer connection state: " + pc.SignalingState.ToString());
+
+        RTCSetSessionDescriptionAsyncOperation remoteDescOp = await SetRemoteDescriptionAsync(pc, offer);
+
+        Debug.Log("Remote Description Setup Complete?: " + remoteDescOp.IsDone + " Error: "  + remoteDescOp.Error.message);
+
+        Debug.Log("Peer connection state: " + pc.SignalingState.ToString());
+
         RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
+
+        Debug.Log("Answer generated: " + answer.Desc.type + " Error: " + answer.Error.message);
+
         Sdp localSdpObject = answer.Desc.sdp.ToSdp();
+
+        Debug.Log("Answer SDP: " + localSdpObject);
+
         foreach (HandlerReceiveOptions options in optionsList)
         {
             var trackId = options.trackId;
@@ -657,16 +692,20 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
             CommonUtils.ApplyCodecParameters(rtpParameters, answerMediaObject);
         }
+
         RTCSessionDescription answerDes = new RTCSessionDescription
         {
             type = RTCSdpType.Answer,
             sdp = localSdpObject.ToText()
         };
+
         if (!_transportReady)
         {
             SetupTransport(DtlsRole.client, localSdpObject);
         }
+
         _ = await SetLocalDescriptionAsync(pc, answerDes);
+
         foreach (HandlerReceiveOptions options in optionsList)
         {
             var trackId = options.trackId;
@@ -687,6 +726,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
                 });
             }
         }
+
+        Debug.Log("Receive Complete");
         return results;
     }
     public virtual async Task StopReceiving(List<string> localIds)
@@ -820,11 +861,13 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         _transportReady = true;
     }
 
-    public void DefaultCallback() {
+    public void DefaultCallback()
+    {
         Debug.Log("Action completed successfully");
     }
 
-    public void ErrBack(Exception exception) {
+    public void ErrBack(Exception exception)
+    {
         throw exception;
     }
 
@@ -849,40 +892,56 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             throw new InvalidOperationException("Method can only be called for handlers with 'recv' direction");
         }
     }
-    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
+    async UniTask<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
     {
-        RTCSessionDescriptionAsyncOperation _offer = pc.CreateOffer();
-        yield return _offer;
+        RTCSessionDescriptionAsyncOperation offer = peerConnection.CreateOffer();
+        var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(offer);
+        await wrapper.WaitForCompletionAsync();
+        return offer;
     }
-    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
+    async UniTask<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
     {
-        RTCSessionDescriptionAsyncOperation _answer = peerConnection.CreateAnswer();
-        yield return _answer;
+        RTCSessionDescriptionAsyncOperation answer = peerConnection.CreateAnswer();
+        var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(answer);
+        await wrapper.WaitForCompletionAsync();
+        return answer;
     }
-    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferIceRestartAsync(RTCPeerConnection peerConnection)
+    async UniTask<RTCSessionDescriptionAsyncOperation> CreateOfferIceRestartAsync(RTCPeerConnection peerConnection)
     {
+
         RTCOfferAnswerOptions options = new RTCOfferAnswerOptions
         {
             iceRestart = true
         };
+
         RTCSessionDescriptionAsyncOperation _offer = peerConnection.CreateOffer(ref options);
-        yield return _offer;
+        var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(_offer);
+        await wrapper.WaitForCompletionAsync();
+        return _offer;
     }
-    IEnumerator SetLocalDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription offerDesc)
+
+    async UniTask<RTCSetSessionDescriptionAsyncOperation> SetLocalDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription offerDesc)
     {
         RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetLocalDescription(ref offerDesc);
-        yield return localDesc;
+        var wrapper = new RTCSetSessionDescriptionAsyncOperationWrapper(localDesc);
+        await wrapper.WaitForCompletionAsync();
+        return localDesc;
     }
-    IEnumerator SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
+
+    async UniTask<RTCSetSessionDescriptionAsyncOperation> SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
     {
         RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetRemoteDescription(ref sessionDescription);
-        yield return localDesc;
+        var wrapper = new RTCSetSessionDescriptionAsyncOperationWrapper(localDesc);
+        await wrapper.WaitForCompletionAsync();
+        return localDesc;
     }
+
     IEnumerator<RTCStatsReportAsyncOperation> GetPcStats(RTCPeerConnection peerConnection)
     {
         RTCStatsReportAsyncOperation report = pc.GetStats();
         yield return report;
     }
+
     IEnumerator<RTCStatsReportAsyncOperation> GetTransreceiverStats(RTCRtpTransceiver transreceiver)
     {
         RTCStatsReportAsyncOperation report = transreceiver.Sender.GetStats();
@@ -968,4 +1027,64 @@ public class HandlerReceiveDataChannelOptions
 public class HandlerEvents
 {
 
+}
+
+public class RTCSetSessionDescriptionAsyncOperationWrapper
+{
+    private readonly RTCSetSessionDescriptionAsyncOperation operation;
+    private readonly TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+
+    public bool IsDone { get; private set; }
+
+    public RTCSetSessionDescriptionAsyncOperationWrapper(RTCSetSessionDescriptionAsyncOperation operation)
+    {
+        this.operation = operation;
+        Task.Run(() => CheckCompletion());
+    }
+
+    private async Task CheckCompletion()
+    {
+        while (!operation.IsDone)
+        {
+            await Task.Delay(100); // Adjust delay as necessary
+        }
+
+        IsDone = true;
+        tcs.SetResult(true);
+    }
+
+    public Task WaitForCompletionAsync()
+    {
+        return tcs.Task;
+    }
+}
+
+public class RTCSessionDescriptionAsyncOperationWrapper
+{
+    private readonly RTCSessionDescriptionAsyncOperation operation;
+    private readonly TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+
+    public bool IsDone { get; private set; }
+
+    public RTCSessionDescriptionAsyncOperationWrapper(RTCSessionDescriptionAsyncOperation operation)
+    {
+        this.operation = operation;
+        Task.Run(() => CheckCompletion());
+    }
+
+    private async Task CheckCompletion()
+    {
+        while (!operation.IsDone)
+        {
+            await Task.Delay(100); // Adjust delay as necessary
+        }
+
+        IsDone = true;
+        tcs.SetResult(true);
+    }
+
+    public Task WaitForCompletionAsync()
+    {
+        return tcs.Task;
+    }
 }

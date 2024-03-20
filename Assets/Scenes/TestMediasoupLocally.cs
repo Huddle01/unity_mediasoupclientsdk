@@ -80,6 +80,8 @@ public class TestMediasoupLocally : MonoBehaviour
         _tokenSource = new CancellationToken();
         await _websocket.ConnectAsync(serverUrl, CancellationToken.None);
         Debug.Log($"Connection successfully with {_websocket.State.ToString()}");
+
+        StartCoroutine(WebRTC.Update());
     }
 
     // Update is called once per frame
@@ -348,7 +350,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
         RtpParameters rtpParameters = JsonConvert.DeserializeObject<RtpParameters>(jsonParsed["rtpParameters"].ToString());
 
-        Debug.Log($"id: {id}, producerId: {producerId}, mediaKind: {mediaKind}, rtpParameters: {JsonConvert.SerializeObject(rtpParameters)}");
+        //Debug.Log($"id: {id}, producerId: {producerId}, mediaKind: {mediaKind}, rtpParameters: {JsonConvert.SerializeObject(rtpParameters)}");
 
         ConsumerOptions options = new ConsumerOptions
         {

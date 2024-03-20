@@ -412,8 +412,11 @@ namespace Mediasoup.Transports
 
             if (isClosed)
             {
+                Debug.LogWarning("Transport is closed");
                 return;
             }
+
+            Debug.Log($"consumerCreationInProgress: {consumerCreationInProgress}");
 
             if (!consumerCreationInProgress)
             {
@@ -556,6 +559,7 @@ namespace Mediasoup.Transports
 
         public async Task CreatePendingConsumer<ConsumerAppData>(Action<Consumer<AppData>> resultCallback) where ConsumerAppData : AppData
         {
+            Debug.Log("CreatePendingConsumer() | Starting creating pending consumer");
             
             if (pendingConsumerTasks.Count == 0)
             {
@@ -582,9 +586,13 @@ namespace Mediasoup.Transports
                 optionsList.Add(tempOption);
             }
 
+            Debug.Log("CreatePendingConsumer() | optionsList created");
+
             try
             {
                 List<HandlerReceiveResult> results = await handlerInterface.Receive(optionsList);
+
+                Debug.Log("CreatePendingConsumer() | resultSize: " + results.Count);
 
                 for (int i = 0; i < results.Count; i++)
                 {
@@ -600,6 +608,8 @@ namespace Mediasoup.Transports
                     var tempLocalId = result.localId;
                     var tempRtpReceiver = result.rtpReceiver;
                     var tempTrack = result.track;
+
+                    Debug.Log("CreatePendingConsumer() | creating consumer");
 
                     Consumer<AppData> tempConsumer = new Consumer<AppData>(tempId, tempLocalId, tempProducerId,
                                                         tempRtpReceiver, tempTrack, tempRtpParam, tempAppData);
@@ -816,6 +826,8 @@ namespace Mediasoup.Transports
 
                 iceGatheringState = _iceGatheringState;
 
+                Debug.Log("Is Transport Closed: " + isClosed );
+
                 if (!isClosed)
                 {
                     _ = await SafeEmit("icegatheringstatechange", _iceGatheringState);
@@ -832,6 +844,8 @@ namespace Mediasoup.Transports
                 }
 
                 connectionState = _connectionState;
+
+                Debug.Log("Is Transport Closed: " + isClosed);
 
                 if (!isClosed)
                 {

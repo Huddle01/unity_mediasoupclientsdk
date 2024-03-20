@@ -1712,12 +1712,11 @@ namespace Mediasoup.Ortc
         {
             ValidateRtpParameters(rtpParam);
 
-            UnityEngine.Debug.Log("Rtp Paramaeters Codec count: " + rtpParam.Codecs.Count);
+            //UnityEngine.Debug.Log("Rtp Paramaeters Codec count: " + rtpParam.Codecs.Count);
 
-            UnityEngine.Debug.Log("rtpParam: " + JsonConvert.SerializeObject(rtpParam));
+            //UnityEngine.Debug.Log("rtpParam: " + JsonConvert.SerializeObject(rtpParam));
 
-            UnityEngine.Debug.Log("extendedRtpCapabilities: " + JsonConvert.SerializeObject(extendedRtpCapabilities));
-
+            //UnityEngine.Debug.Log("extendedRtpCapabilities: " + JsonConvert.SerializeObject(extendedRtpCapabilities));
 
 
             if (rtpParam.Codecs.Count==0) 
@@ -1727,7 +1726,7 @@ namespace Mediasoup.Ortc
 
             var firstMediaCodec = rtpParam.Codecs[0];
 
-            return extendedRtpCapabilities.codecs.Any(codec => codec.localPayloadType == firstMediaCodec.PayloadType);
+            return extendedRtpCapabilities.codecs.Any(codec => codec.remotePayloadType == firstMediaCodec.PayloadType);
 
         }
 
