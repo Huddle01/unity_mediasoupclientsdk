@@ -1072,6 +1072,12 @@ namespace Utilme.SdpTransform
                 .Replace(Simulcast.Label, string.Empty)
                 .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var subTokens = tokens[1].Split(';');
+
+            foreach (var item in subTokens)
+            {
+                item.Replace('~','r');
+            }
+
             return new Simulcast
             {
                 Direction = tokens[0].EnumFromStringValue<RidDirection>(),
