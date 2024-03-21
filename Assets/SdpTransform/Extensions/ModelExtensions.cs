@@ -1073,9 +1073,9 @@ namespace Utilme.SdpTransform
                 .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var subTokens = tokens[1].Split(';');
 
-            foreach (var item in subTokens)
+            for (int i = 0; i < subTokens.Length; i++)
             {
-                item.Replace('~','r');
+                subTokens[i] = subTokens[i].Replace("~", "");
             }
 
             return new Simulcast
@@ -1086,11 +1086,14 @@ namespace Utilme.SdpTransform
 
         }
 
-        public static string ToText(this Simulcast simulcast) =>
-            $"{Sdp.AttributeIndicator}{Simulcast.Label}" +
-                $"{simulcast.Direction.GetStringValue()} " +
-                $"{string.Join(";", simulcast.IdList)}" +
-                $"{Sdp.CRLF}";
+        public static string ToText(this Simulcast simulcast) 
+        {
+            return $"{Sdp.AttributeIndicator}{Simulcast.Label}" +
+                    $"{simulcast.Direction.GetStringValue()} " +
+                    $"{string.Join(";", simulcast.IdList)}" +
+                    $"{Sdp.CRLF}";
+        }
+            
 
         public static Rtpmap ToRtpmap(this string str)
         {
