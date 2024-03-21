@@ -99,7 +99,7 @@ public class RemoteSdp
                     break;
             }
 
-            fingerPrint.HashValue = Encoding.UTF8.GetBytes(stldFingerPrint.value);
+            fingerPrint.HashValue = HexadecimalStringToByteArray(stldFingerPrint.value.Replace(":", string.Empty));
             //fingerPrint.HashValue = Encoding.UTF8.GetBytes(stldFingerPrint.value);
 
             sdpObject.Attributes.Fingerprint = fingerPrint;
@@ -131,6 +131,18 @@ public class RemoteSdp
 
         Debug.Log($"Final Remote SDP object: {sdpObject.ToText()}");
 
+    }
+
+    public static byte[] HexadecimalStringToByteArray(String hexadecimalString)
+    {
+        Debug.Log("Fingerprint hexadecimal string: " + hexadecimalString);
+        int length = hexadecimalString.Length;
+        byte[] byteArray = new byte[length / 2];
+        for (int i = 0; i < length; i += 2)
+        {
+            byteArray[i / 2] = Convert.ToByte(hexadecimalString.Substring(i, 2), 16);
+        }
+        return byteArray;
     }
 
     public void UpdateIceParameters(IceParameters _iceParameters)

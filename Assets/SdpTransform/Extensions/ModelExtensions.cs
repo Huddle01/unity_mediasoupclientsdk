@@ -319,12 +319,6 @@ namespace Utilme.SdpTransform
                     sb.Append(md.Attributes.Mid.ToText());
                 if (md.Attributes.Msid is not null)
                     sb.Append(md.Attributes.Msid.ToText());
-                if (md.Attributes.IceUfrag is not null)
-                    sb.Append(md.Attributes.IceUfrag.ToText());
-                if (md.Attributes.IcePwd is not null)
-                    sb.Append(md.Attributes.IcePwd.ToText());
-                if (md.Attributes.IceOptions is not null)
-                    sb.Append(md.Attributes.IceOptions.ToText());
                 if (md.Attributes.Fingerprint is not null)
                     sb.Append(md.Attributes.Fingerprint.ToText());
                 if (md.Attributes.Rtcp is not null)
@@ -337,10 +331,17 @@ namespace Utilme.SdpTransform
                     sb.Append(md.Attributes.MaxMessageSize.ToText());
                 if (md.Attributes.Simulcast is not null)
                     sb.Append(md.Attributes.Simulcast.ToText());
+                if (md.Attributes.IceUfrag is not null)
+                    sb.Append(md.Attributes.IceUfrag.ToText());
+                if (md.Attributes.IcePwd is not null)
+                    sb.Append(md.Attributes.IcePwd.ToText());
+                if (md.Attributes.IceOptions is not null)
+                    sb.Append(md.Attributes.IceOptions.ToText());
                 if (md.Attributes.Candidates is not null)
                     foreach (var c in md.Attributes.Candidates)
                         sb.Append(c.ToText());
-                if (md.Attributes.EndOfCandidates.HasValue)
+                bool shouldAppendEndOfCandidates = md.Attributes.EndOfCandidates.HasValue && md.Attributes.EndOfCandidates.Value;
+                if (shouldAppendEndOfCandidates == true)
                     sb.Append($"{Sdp.AttributeIndicator}{Attributes.EndOfCandidatesLabel}{Sdp.CRLF}");
                 if (md.Attributes.Ssrcs is not null)
                     foreach (var s in md.Attributes.Ssrcs)
@@ -758,7 +759,7 @@ namespace Utilme.SdpTransform
         }
 
         public static string ToText(this MsidSemantic msidSemantic) =>
-            $"{Sdp.AttributeIndicator}{MsidSemantic.Label}" + $"{msidSemantic.WebRtcMediaStreamToken} " +
+            $"{Sdp.AttributeIndicator}{MsidSemantic.Label} " + 
                 $"{msidSemantic.Token} " +
                 $"{(msidSemantic.IdList is not null ? string.Join(" ", msidSemantic.IdList) : string.Empty)}" +
                 $"{Sdp.CRLF}";
@@ -865,7 +866,7 @@ namespace Utilme.SdpTransform
         public static string ToText(this Fingerprint fingerprint) =>
             $"{Sdp.AttributeIndicator}{Fingerprint.Label}" +
                 $"{fingerprint.HashFunction.GetStringValue()} " +
-                $"{System.Text.Encoding.UTF8.GetString(fingerprint.HashValue).Replace("-", ":")}" +
+                $"{BitConverter.ToString(fingerprint.HashValue).Replace("-", ":")}" +
                 $"{Sdp.CRLF}";
 
         public static Rtcp ToRtcp(this string str)

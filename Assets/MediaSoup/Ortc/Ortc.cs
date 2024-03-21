@@ -1339,7 +1339,7 @@ namespace Mediasoup.Ortc
             {
                 foreach (RtpCodecParameters codec in rtpParameters.Codecs)
                 {
-                    codec.RtcpFeedback = codec.RtcpFeedback.FindAll(fb => fb.Type == "goog-remb");
+                    codec.RtcpFeedback = codec.RtcpFeedback.FindAll(fb => fb.Type != "goog-remb");
                 }
             }
             else if (

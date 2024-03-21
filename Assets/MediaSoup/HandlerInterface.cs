@@ -91,7 +91,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
 
-        Debug.Log(offer.Desc.sdp);
+        Debug.Log("GetNativeRtpCapabilites: " + offer.Desc.sdp);
 
         try
         {
@@ -101,26 +101,20 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         Sdp sdp = offer.Desc.sdp.ToSdp();
 
-        var nativeRtpCapabilities = CommonUtils.ExtractRtpCapabilities(sdp);
+        Debug.Log("GetNativeRtpCapabilites() | SDP to Text: " + sdp.ToText());
 
-        foreach (var item in nativeRtpCapabilities.Codecs)
-        {
-            //Debug.Log($"codec values {item.MimeType}");
-        }
+        var nativeRtpCapabilities = CommonUtils.ExtractRtpCapabilities(sdp);
 
         // libwebrtc supports NACK for OPUS but doesn't announce it.
         OrtcUtils.AddNackSuppportForOpus(nativeRtpCapabilities);
 
         return nativeRtpCapabilities;
-
-
     }
 
     public virtual SctpCapabilities GetNativeSctpCapabilities()
     {
         return sctpCapabilities;
     }
-
 
     public virtual void Run(HandlerRunOptions options)
     {
@@ -161,7 +155,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         {
             _ = Emit("@icegatheringstatechange", state);
         };
-
 
         pc.OnConnectionStateChange += (state) =>
         {
@@ -271,12 +264,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     {
         if (options.encodings != null && options.encodings.Count > 1)
         {
-            int idx = 0;
-            foreach (var encoding in options.encodings)
-            {
-                encoding.Rid = idx.ToString();
-                idx++;
-            }
 
             // Set rid and verify scalabilityMode in each encoding.
             // NOTE: Even if WebRTC allows different scalabilityMode (different number
@@ -284,7 +271,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             // same in all them, so let's pick up the highest value.
             // NOTE: If scalabilityMode is not given, Chrome will use L1T3.
 
-            int nextRid = 1;
             int maxTemporalLayers = 1;
 
             foreach (var encoding in options.encodings)
@@ -299,10 +285,12 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
                 }
             }
 
+            int idx = 0;
             foreach (var encoding in options.encodings)
             {
-                encoding.Rid = nextRid++.ToString();
+                encoding.Rid = $"r{idx}";
                 encoding.ScalabilityMode = $"L1T{maxTemporalLayers}";
+                idx++;
             }
 
         }
@@ -313,9 +301,10 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         RtpParameters sendingRemoteRtpParameters = Utils.Clone(_sendingRemoteRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
         sendingRemoteRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRemoteRtpParameters.Codecs, options.codec);
+        Debug.Log("Sending Remote RTP Parameters: " + JsonConvert.SerializeObject(sendingRemoteRtpParameters));
 
         Tuple<int, string> mediaSectionIdx = remoteSdp.GetNextMediaSectionIdx();
-        Debug.Log($"mediaSectionIdx value {mediaSectionIdx.Item2}");
+        //Debug.Log($"mediaSectionIdx value {mediaSectionIdx.Item2}");
 
         RTCRtpTransceiverInit transceiverInit = new RTCRtpTransceiverInit
         {
@@ -332,13 +321,15 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         Sdp localSdp = offer.Desc.sdp.ToSdp();
 
+        Debug.Log("Local SDP: " + offer.Desc.sdp);
+
         if (!_transportReady)
         {
             DtlsRole localRole = DtlsRole.client;
             SetupTransport(localRole, localSdp);
         }
 
-        Debug.Log($"SetLocalDescriptionAsync");
+        //Debug.Log($"SetLocalDescriptionAsync");
 
         var localDescSetupOp = await SetLocalDescriptionAsync(pc, offer.Desc);
 
@@ -397,14 +388,14 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         Debug.Log("Remote SDP: " + remoteSdp.GetSdp());
 
         Debug.Log($"Session Description: {sessionDescription.sdp}");
-        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
+        Debug.Log($"PC State complete: {pc.SignalingState}");
         //Debug.Log($"Media FMts: {remoteSdp}");
 
         var remoteSdbSetupOp = await SetRemoteDescriptionAsync(pc, sessionDescription);
 
-        Debug.Log($"remoteSdbSetupOp complete: {remoteSdbSetupOp.IsDone}, Error: {(remoteSdbSetupOp.IsError ? remoteSdbSetupOp.Error.ToString() : "No Error")}");
+        Debug.Log($"remoteSdbSetupOp complete: {remoteSdbSetupOp.IsDone}, Error: {remoteSdbSetupOp.Error.message}");
 
-        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
+        Debug.Log($"PC State complete: {pc.SignalingState}");
 
         // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
@@ -665,13 +656,14 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         RTCSetSessionDescriptionAsyncOperation remoteDescOp = await SetRemoteDescriptionAsync(pc, offer);
 
-        Debug.Log("Remote Description Setup Complete?: " + remoteDescOp.IsDone + " Error: "  + remoteDescOp.Error.message);
+        Debug.Log("Remote Description Setup Complete?: " + remoteDescOp.IsDone + " Error: " + remoteDescOp.Error.message);
 
         Debug.Log("Peer connection state: " + pc.SignalingState.ToString());
 
         RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
 
         Debug.Log("Answer generated: " + answer.Desc.type + " Error: " + answer.Error.message);
+        Debug.Log("Peer connection state: " + pc.SignalingState.ToString());
 
         Sdp localSdpObject = answer.Desc.sdp.ToSdp();
 
@@ -696,7 +688,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         RTCSessionDescription answerDes = new RTCSessionDescription
         {
             type = RTCSdpType.Answer,
-            sdp = localSdpObject.ToText()
+            sdp = answer.Desc.sdp
         };
 
         if (!_transportReady)
@@ -704,7 +696,9 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             SetupTransport(DtlsRole.client, localSdpObject);
         }
 
-        _ = await SetLocalDescriptionAsync(pc, answerDes);
+        var setLocalDescOp = await SetLocalDescriptionAsync(pc, answerDes);
+
+        Debug.Log("Local Description Setup Complete?: " + setLocalDescOp.IsDone + " Error: " + setLocalDescOp.Error.message);
 
         foreach (HandlerReceiveOptions options in optionsList)
         {
@@ -863,7 +857,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
     public void DefaultCallback()
     {
-        Debug.Log("Action completed successfully");
+        //Debug.Log("Action completed successfully");
     }
 
     public void ErrBack(Exception exception)
@@ -930,10 +924,10 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
     async UniTask<RTCSetSessionDescriptionAsyncOperation> SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
     {
-        RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetRemoteDescription(ref sessionDescription);
-        var wrapper = new RTCSetSessionDescriptionAsyncOperationWrapper(localDesc);
+        RTCSetSessionDescriptionAsyncOperation remoteDesc = peerConnection.SetRemoteDescription(ref sessionDescription);
+        var wrapper = new RTCSetSessionDescriptionAsyncOperationWrapper(remoteDesc);
         await wrapper.WaitForCompletionAsync();
-        return localDesc;
+        return remoteDesc;
     }
 
     IEnumerator<RTCStatsReportAsyncOperation> GetPcStats(RTCPeerConnection peerConnection)

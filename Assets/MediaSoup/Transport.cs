@@ -316,6 +316,7 @@ namespace Mediasoup.Transports
 
                     normalizedEncoding.Dtx = encoding.Dtx;
                     normalizedEncoding.ScalabilityMode = encoding.ScalabilityMode;
+                    normalizedEncoding.Rid = encoding.Rid;
                     if (encoding.ScaleResolutionDownBy.HasValue)
                         normalizedEncoding.ScaleResolutionDownBy = encoding.ScaleResolutionDownBy.Value;
                     if (encoding.MaxBitrate.HasValue)
@@ -811,7 +812,7 @@ namespace Mediasoup.Transports
                     return;
                 }
 
-                Debug.Log("Emitting connect event on transport");
+                //Debug.Log("Emitting connect event on transport");
                 _ = await SafeEmit("connect", dtlsParams, connectCallback, connectErrback);
             });
 

@@ -67,6 +67,7 @@ public class MediaSection
 
             }
 
+            _mediaObject.Attributes.EndOfCandidates = true;
             _mediaObject.Attributes.IceOptions = new IceOptions { Tags = Enumerable.Repeat("renomination", 1).ToArray() };
 
             if (_dtlsParameters != null) { SetDtlsRole(_dtlsParameters.role); }
@@ -188,7 +189,7 @@ public class AnswerMediaSection : MediaSection
 
             if (_plainRtpParameters == null)
             {
-                _mediaObject.ConnectionData = new ConnectionData { ConnectionAddress = "127.0.0.0" };
+                _mediaObject.ConnectionData = new ConnectionData { ConnectionAddress = "127.0.0.1" };
                 _mediaObject.Port = 7;
                 _mediaObject.Proto = tempMediaDes.Proto;
             }
@@ -509,6 +510,8 @@ public class AnswerMediaSection : MediaSection
                                 IdList = tempMediaDes.Attributes.Simulcast.IdList
                             };
 
+                            Debug.Log("AnswerMediaSection() | Simulcast Id: " + string.Join(";", tempMediaDes.Attributes.Simulcast.IdList));
+
                             _mediaObject.Attributes.Rids = new List<Rid>();
 
                             foreach (Rid rid in tempMediaDes.Attributes.Rids)
@@ -521,8 +524,6 @@ public class AnswerMediaSection : MediaSection
                                     Id = rid.Id,
                                     Direction = RidDirection.Recv,
                                 });
-
-
                             }
 
                         }
@@ -591,13 +592,19 @@ public class AnswerMediaSection : MediaSection
         {
             foreach (var simulcastFormat in simulcastStream)
             {
-                simulcastFormat.Paused = !layers.TryGetValue(simulcastFormat.Scid.ToString(), out var layer) || !layer.active;
+                if (layers.TryGetValue(simulcastFormat.Scid.ToString(), out var layer)) {
+                    simulcastFormat.Paused = layer.active == false;
+                }
             }
         }
+
+        Debug.Log($"MuxSimulcastStreams() | Generating");
 
         _mediaObject.Attributes.Simulcast.IdList = simulcastStreams.Select(simulcastFormats =>
                 string.Join(",", simulcastFormats.Select(f => $"{(f.Paused ? "~" : "")}{f.Scid}")))
             .ToArray();
+
+        Debug.Log("MuxSimulcastStreams() | Simulcast string: " + string.Join(";", _mediaObject.Attributes.Simulcast.IdList));
 
     }
 
@@ -648,7 +655,7 @@ public class OfferMediaSection : MediaSection
             Debug.Log("OfferMediaSection | cons() | Attributes is null");
             _mediaObject.Attributes = new Attributes();
         }
-        if (_mediaObject.Attributes.Mid == null )
+        if (_mediaObject.Attributes.Mid == null)
         {
             Debug.Log("OfferMediaSection | cons() | Mid is null");
             _mediaObject.Attributes.Mid = new Mid();

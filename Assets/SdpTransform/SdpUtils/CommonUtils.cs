@@ -5,6 +5,8 @@ using System.Linq;
 using Mediasoup.Transports;
 using System;
 using System.Text;
+using System.Diagnostics;
+using Newtonsoft.Json;
 
 public class CommonUtils
 {
@@ -84,7 +86,6 @@ public class CommonUtils
             }
 
             // Get RTCP feedback for each codec.
-
             foreach (var fb in mediaDes.Attributes.RtcpFbs)
             {
                 RtcpFeedback feedback = new RtcpFeedback
@@ -95,10 +96,12 @@ public class CommonUtils
 
                 if (codecsMap.ContainsKey(fb.PayloadType))
                 {
-                    if (codecsMap[fb.PayloadType] != null)
+                    if (codecsMap[fb.PayloadType] == null)
                     {
                         continue;
                     }
+
+                    if (codecsMap[fb.PayloadType].RtcpFeedback == null) codecsMap[fb.PayloadType].RtcpFeedback = new List<RtcpFeedback> { };
 
                     codecsMap[fb.PayloadType].RtcpFeedback.Add(feedback);
                 }
@@ -131,6 +134,8 @@ public class CommonUtils
             Codecs = codecsMap.Values.ToList(),
             HeaderExtensions = headerExtensions
         };
+
+        UnityEngine.Debug.Log($"Codec: {JsonConvert.SerializeObject(rtpCapabilities.Codecs)}");
 
         return rtpCapabilities;
     }
@@ -209,7 +214,7 @@ public class CommonUtils
                 break;
         }
 
-        finger.value = Encoding.UTF8.GetString(fingerPrint.HashValue);
+        finger.value = BitConverter.ToString(fingerPrint.HashValue).Replace("-", ":");
 
         fingerPrintLIst.Add(finger);
 

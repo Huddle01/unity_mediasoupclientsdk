@@ -40,7 +40,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
     private CancellationToken _tokenSource;
 
-    private string _socketUrl = "ws://localhost:8080";
+    private string _socketUrl = "ws://localhost:8081";
 
     private string _producerId;
 
@@ -71,7 +71,8 @@ public class TestMediasoupLocally : MonoBehaviour
                         },
 
             codecOptions = { videoGoogleStartBitrate = 1000 },
-            codec = { Kind = MediaKind.VIDEO, MimeType = "video/VP8", ClockRate = 90000, PreferredPayloadType = 127 , Parameters = new Dictionary<string, object>() { { "x-google-start-bitrate", 1000} } },
+            codec = { Kind = MediaKind.VIDEO, MimeType = "video/VP8", ClockRate = 90000, Parameters = new Dictionary<string, object>() { { "x-google-start-bitrate", 1000 } },
+                RtcpFeedback = new List<RtcpFeedback> { new RtcpFeedback {Type = "nack" }, new RtcpFeedback { Type = "nack", Parameter = "pli" }, new RtcpFeedback { Type = "Transport-cc" } , new RtcpFeedback { Type = "goog-remb" } } },
         };
 
         _websocket = new ClientWebSocket();
@@ -167,7 +168,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
         SendTransport.On("connect", async (args) =>
         {
-            Debug.Log("Send Transport connected");
+            //Debug.Log("Send Transport connected");
             DtlsParameters dtlsParameters = (DtlsParameters)args[0];
             Action callBack = (Action)args[1];
             Action<Exception> errBack = (Action<Exception>)args[2];
@@ -221,6 +222,9 @@ public class TestMediasoupLocally : MonoBehaviour
     private async Task<string> GetProducerId(TrackKind kind, RtpParameters rtp, AppData _appdata)
     {
         RtpParameters rtpParameters = rtp;
+
+        rtpParameters.Codecs[0].RtcpFeedback = ProducerOptionsObj.codec.RtcpFeedback;
+
         var responseData = new
         {
             transportId = SendTransport.id,
@@ -340,9 +344,9 @@ public class TestMediasoupLocally : MonoBehaviour
 
         var jsonParsed = JObject.Parse(receivedMessage)["data"]["params"];
 
-        string id = (string) jsonParsed["id"];
-        string producerId = (string) jsonParsed["producerId"];
-        string mediaKind = (string) jsonParsed["kind"];
+        string id = (string)jsonParsed["id"];
+        string producerId = (string)jsonParsed["producerId"];
+        string mediaKind = (string)jsonParsed["kind"];
 
         Debug.Log($"id {id}, producerId: {producerId}, mediaKind: {mediaKind}");
 
@@ -365,17 +369,27 @@ public class TestMediasoupLocally : MonoBehaviour
         ReceiveTransport.ConsumeAsync<AppData>(options, HandleConsumer);
     }
 
-    private void HandleConsumer(Consumer<AppData> consumer) 
+    private void HandleConsumer(Consumer<AppData> consumer)
     {
         Debug.Log("Consumer Creation Done");
         ConsumerObj = consumer;
 
+        Debug.Log("Consumer Obj null?? " + ConsumerObj == null);
+        Debug.Log("Is track null?? " + ConsumerObj.track == null);
+
         VideoStreamTrack track = ConsumerObj.track as VideoStreamTrack;
+
+        track.Enabled = true;
 
         track.OnVideoReceived += tex =>
         {
             _remoteVideoSource.texture = tex;
         };
+
+        Debug.Log("Emitting consume resume");
+        var consumeResponse = new { type = "consumer-resume" };
+        var consumeResponsePayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(consumeResponse));
+        _websocket.SendAsync(consumeResponsePayload, WebSocketMessageType.Text, true, CancellationToken.None);
     }
 
     private IEnumerator CaptureWebCamVideo()
