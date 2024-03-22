@@ -24,7 +24,7 @@ namespace Mediasoup.RtpParameter
         /// The number of channels supported (e.g. two for stereo). Just for audio.
         /// Default 1.
         /// </summary>
-        [JsonProperty("channels")]
+        [JsonProperty("channels", NullValueHandling = NullValueHandling.Ignore)]
         public byte? Channels { get; set; }
 
         /// <summary>
