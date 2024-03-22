@@ -23,7 +23,7 @@ namespace Mediasoup.RtpParameter
         /// Media kind.
         /// Default any media kind.
         /// </summary>
-        [JsonProperty("mimeType")]
+        [JsonProperty("kind")]
         public MediaKind? Kind { get; set; }
 
         /// <summary>

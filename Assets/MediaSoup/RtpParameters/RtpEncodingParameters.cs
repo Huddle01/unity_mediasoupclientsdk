@@ -16,7 +16,7 @@ namespace Mediasoup.RtpParameter
         /// The media SSRC.
         /// </summary>
 
-        [JsonProperty("ssrc")]
+        [JsonProperty("ssrc", NullValueHandling =NullValueHandling.Ignore)]
         public uint? Ssrc { get; set; }
 
         /// <summary>
@@ -29,14 +29,14 @@ namespace Mediasoup.RtpParameter
         /// Codec payload type this encoding affects. If unset, first media codec is
         /// chosen.
         /// </summary>
-        [JsonProperty("codecPayloadType")]
+        [JsonProperty("codecPayloadType", NullValueHandling = NullValueHandling.Ignore)]
         public byte? CodecPayloadType { get; set; }
 
         /// <summary>
         /// RTX stream information. It must contain a numeric ssrc field indicating
         /// the RTX SSRC.
         /// </summary>
-        [JsonProperty("rtx")]
+        [JsonProperty("rtx", NullValueHandling = NullValueHandling.Ignore)]
         public Rtx? Rtx { get; set; }
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace Mediasoup.RtpParameter
         /// <summary>
         /// Unused.
         /// </summary>
-        [JsonProperty("scaleResolutionDownBy")]
+        [JsonProperty("scaleResolutionDownBy", NullValueHandling = NullValueHandling.Ignore)]
         public int? ScaleResolutionDownBy { get; set; }
 
         /// <summary>
@@ -68,16 +68,16 @@ namespace Mediasoup.RtpParameter
         public uint? MaxBitrate { get; set; }
 
 
-        [JsonProperty("maxFramerate")]
+        [JsonProperty("maxFramerate", NullValueHandling = NullValueHandling.Ignore)]
         public uint? MaxFramerate { get; set; }
 
-        [JsonProperty("adaptivePtime")]
+        [JsonProperty("adaptivePtime", NullValueHandling = NullValueHandling.Ignore)]
         public bool? AdaptivePtime { get; set;  }
 
-        [JsonProperty("priority")]
+        [JsonProperty("priority", NullValueHandling = NullValueHandling.Ignore)]
         public PriorityLevel? priority { get; set; }
 
-        [JsonProperty("networkPriority")]
+        [JsonProperty("networkPriority", NullValueHandling = NullValueHandling.Ignore)]
         public PriorityLevel? networkPriority { get; set; }
 
 

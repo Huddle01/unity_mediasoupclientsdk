@@ -448,7 +448,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             Debug.Log($"IceCandidate: {iceCandidate}, Candidate: {iceCandidate.Candidate}, Type: {iceCandidate.Type}, Address: {iceCandidate.Address}, port: {iceCandidate.Port}, username: {iceCandidate.UserNameFragment}, isIceCandidateAddded: {isIceCandidateAdded}, ");
         }
 
-        File.WriteAllText(Application.streamingAssetsPath + "/stats2.json", statsString);
+        File.WriteAllText(Application.streamingAssetsPath + "/aa/stats2.json", statsString);
         // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
 
