@@ -1,5 +1,12 @@
 {
   "dependencies": {
+    "com.cysharp.unitask": {
+      "version": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "809d23edae0df58fd0f61b4b6f67855c59d1b2fb"
+    },
     "com.unity.collab-proxy": {
       "version": "2.2.0",
       "depth": 0,
@@ -32,7 +39,7 @@
         "com.unity.editorcoroutines": "1.0.0",
         "com.unity.performance.profile-analyzer": "1.2.2",
         "com.unity.test-framework": "1.1.33",
-        "com.unity.testtools.codecoverage": "1.2.4"
+        "com.unity.testtools.codecoverage": "1.2.5"
       }
     },
     "com.unity.ide.rider": {
@@ -56,6 +63,13 @@
     "com.unity.ide.vscode": {
       "version": "1.2.5",
       "depth": 1,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.nuget.newtonsoft-json": {
+      "version": "3.2.1",
+      "depth": 0,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
@@ -86,7 +100,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.testtools.codecoverage": {
-      "version": "1.2.4",
+      "version": "1.2.5",
       "depth": 1,
       "source": "registry",
       "dependencies": {
