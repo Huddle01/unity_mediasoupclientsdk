@@ -7,6 +7,9 @@ namespace Mediasoup.RtpParameter
 {
     public class RtpEncodingParameters
     {
+
+
+        [JsonProperty("active")]
         public bool Active { get; set; }
 
         /// <summary>

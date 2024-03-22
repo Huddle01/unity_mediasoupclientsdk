@@ -69,6 +69,7 @@ public class MediaSection
 
             _mediaObject.Attributes.EndOfCandidates = true;
             _mediaObject.Attributes.IceOptions = new IceOptions { Tags = Enumerable.Repeat("renomination", 1).ToArray() };
+            //_mediaObject.Attributes.IceOptions = new IceOptions { Tags = Enumerable.Repeat("trickle", 1).ToArray() };
 
             if (_dtlsParameters != null) { SetDtlsRole(_dtlsParameters.role); }
 
@@ -254,7 +255,7 @@ public class AnswerMediaSection : MediaSection
                             {
                                 RtpCodecParameters offerCodec = _offerRtp!.Codecs.Find(x => x.PayloadType == codec.PayloadType);
 
-                                Debug.Log("MediaSection | offerCodec : " + JsonConvert.SerializeObject(offerCodec));
+                                //Debug.Log("MediaSection | offerCodec : " + JsonConvert.SerializeObject(offerCodec));
 
                                 switch (codec.MimeType.ToLower())
                                 {
@@ -445,7 +446,7 @@ public class AnswerMediaSection : MediaSection
 
                                 foreach (var key in codecParameters.Keys)
                                 {
-                                    Debug.Log("MediaSection CodecParameter Key: " + key + $" value {codecParameters[key]}");
+                                    //Debug.Log("MediaSection CodecParameter Key: " + key + $" value {codecParameters[key]}");
                                     if (!string.IsNullOrEmpty(fmtp.Value))
                                     {
                                         fmtp.Value += ";";
@@ -455,7 +456,7 @@ public class AnswerMediaSection : MediaSection
                                     fmtp.Value += $"{key}={codecParameters[key]}";
                                 }
 
-                                Debug.Log($"fmtp Value: {fmtp.Value}");
+                                //Debug.Log($"fmtp Value: {fmtp.Value}");
 
                                 if (!string.IsNullOrEmpty(fmtp.Value))
                                 {

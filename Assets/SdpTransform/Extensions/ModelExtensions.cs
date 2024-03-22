@@ -602,8 +602,8 @@ namespace Utilme.SdpTransform
         }
 
         public static string ToText(this Timing timing) =>
-            $"{Sdp.TimingIndicator}{(timing.StartTime - new DateTime(1900, 1, 1)).TotalSeconds} " +
-                $"{(timing.StopTime - new DateTime(1900, 1, 1)).TotalSeconds}" +
+            $"{Sdp.TimingIndicator}0 " +
+                $"0" +
                 $"{Sdp.CRLF}";
 
         public static RepeatTime ToRepeatTime(this string str)
@@ -759,8 +759,8 @@ namespace Utilme.SdpTransform
         }
 
         public static string ToText(this MsidSemantic msidSemantic) =>
-            $"{Sdp.AttributeIndicator}{MsidSemantic.Label} " + 
-                $"{msidSemantic.Token} " +
+            $"{Sdp.AttributeIndicator}{MsidSemantic.Label} " + $"{msidSemantic.WebRtcMediaStreamToken} " +
+                $"{(msidSemantic.Token == msidSemantic.WebRtcMediaStreamToken ? string.Empty : msidSemantic.Token)} " +
                 $"{(msidSemantic.IdList is not null ? string.Join(" ", msidSemantic.IdList) : string.Empty)}" +
                 $"{Sdp.CRLF}";
 
@@ -1072,11 +1072,6 @@ namespace Utilme.SdpTransform
                 .Replace(Simulcast.Label, string.Empty)
                 .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var subTokens = tokens[1].Split(';');
-
-            for (int i = 0; i < subTokens.Length; i++)
-            {
-                subTokens[i] = subTokens[i].Replace("~", "");
-            }
 
             return new Simulcast
             {

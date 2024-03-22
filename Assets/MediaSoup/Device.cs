@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using Mediasoup.Transports;
 using Mediasoup.Types;
 using System.Threading.Tasks;
-using System.Diagnostics;
 
 namespace Mediasoup 
 {
@@ -65,7 +64,7 @@ namespace Mediasoup
             // This may throw
             ORTC.ValidateRtpCapabilities(nativeRtpCapabilities);
 
-            this.extendedRtpCapabilities = ORTC.GetExtendedRtpCapabilities(routerRtpCapabilities, nativeRtpCapabilities);
+            this.extendedRtpCapabilities = ORTC.GetExtendedRtpCapabilities(nativeRtpCapabilities, routerRtpCapabilities);
 
             UnityEngine.Debug.Log("Got Extended RTP Capabilities: " + JsonConvert.SerializeObject(extendedRtpCapabilities));
 
@@ -73,7 +72,6 @@ namespace Mediasoup
             canProduceByKind.Add(MediaKind.VIDEO, ORTC.CanSend(MediaKind.VIDEO, extendedRtpCapabilities));
 
             recvRtpCapabilities = ORTC.GetRecvRtpCapabilities(extendedRtpCapabilities);
-
 
             UnityEngine.Debug.Log("Got Recieve RTP Capabilities: " + JsonConvert.SerializeObject(recvRtpCapabilities));
 
