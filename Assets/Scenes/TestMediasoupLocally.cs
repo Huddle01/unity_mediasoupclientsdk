@@ -71,8 +71,6 @@ public class TestMediasoupLocally : MonoBehaviour
                         },
 
             codecOptions = { videoGoogleStartBitrate = 1000 },
-            codec = { Kind = MediaKind.VIDEO, MimeType = "video/VP8", ClockRate = 90000, Parameters = new Dictionary<string, object>() { { "x-google-start-bitrate", 1000 } },
-                RtcpFeedback = new List<RtcpFeedback> { new RtcpFeedback {Type = "nack" }, new RtcpFeedback { Type = "nack", Parameter = "pli" }, new RtcpFeedback { Type = "Transport-cc" } , new RtcpFeedback { Type = "goog-remb" } } },
         };
 
         _websocket = new ClientWebSocket();
@@ -94,7 +92,11 @@ public class TestMediasoupLocally : MonoBehaviour
     public void GetLocalVideo()
     {
         StartCoroutine(CaptureWebCamVideo());
-        ProducerOptionsObj.track = new VideoStreamTrack(_webCamTexture);
+        VideoStreamTrack videoStreamTrack = new VideoStreamTrack(_webCamTexture);
+        videoStreamTrack.Enabled = true;
+        ProducerOptionsObj.track = videoStreamTrack;
+
+        Debug.Log("Video Stream State: " + videoStreamTrack.ReadyState);
     }
 
     public async void GetRtpCapabilities()
@@ -144,6 +146,7 @@ public class TestMediasoupLocally : MonoBehaviour
         IceParameters iceParameters = JsonConvert.DeserializeObject<IceParameters>(jsonParsed["data"]["iceParameters"].ToString());
 
         List<IceCandidate> iceCandidates = JsonConvert.DeserializeObject<List<IceCandidate>>(jsonParsed["data"]["iceCandidates"].ToString());
+        Debug.Log($"Ice Candidate received from server: {jsonParsed["data"]["iceCandidates"]}");
 
         DtlsParameters dtlsParameters = JsonConvert.DeserializeObject<DtlsParameters>(jsonParsed["data"]["dtlsParameters"].ToString());
 
@@ -200,6 +203,18 @@ public class TestMediasoupLocally : MonoBehaviour
         {
             Debug.Log("Send Transport starting to produce");
         });
+
+        SendTransport.On("restartIce", async (args) =>
+        {
+            Debug.Log("Restarting Ice Request send to server");
+            var responseData = new Dictionary<string, object>
+            {
+                { "iceCandidates", iceCandidates}
+            };
+            var responseObj = new { type = "transport-connect", data = responseData };
+            var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(responseObj));
+            await _websocket.SendAsync(encodedPayload, WebSocketMessageType.Text, true, CancellationToken.None);
+        });
     }
 
     public async void ConnectSendTransportAndProduce()
@@ -234,7 +249,11 @@ public class TestMediasoupLocally : MonoBehaviour
 
         var data = new { type = "transport-produce", data = responseData };
 
-        var encodedPayload = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+        var transportProduceResponseString = JsonConvert.SerializeObject(data);
+
+        Debug.Log("Transport-Produce response: " + transportProduceResponseString);
+
+        var encodedPayload = Encoding.UTF8.GetBytes(transportProduceResponseString);
 
         Debug.Log($"transport-produce request: {encodedPayload}");
 

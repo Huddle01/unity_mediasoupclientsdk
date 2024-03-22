@@ -305,7 +305,7 @@ namespace Mediasoup
         public bool disableTrackOnPause;
         public bool zeroRtpOnPause;
         public TProducerAppData appData;
-
+        public string? remoteSDP;
     }
 
     public class ProducerObserverEvents

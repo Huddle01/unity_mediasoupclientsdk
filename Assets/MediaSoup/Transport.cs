@@ -1,8 +1,6 @@
-using System.Collections;
 using System.Collections.Generic;
 using System;
 using System.Linq;
-using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using Unity.WebRTC;
 using Mediasoup.Internal;
@@ -11,13 +9,10 @@ using Mediasoup.DataProducers;
 using Mediasoup.RtpParameter;
 using Mediasoup.SctpParameter;
 using Mediasoup.Ortc;
-using Mediasoup;
 using System.Threading.Tasks;
 using Mediasoup.Types;
 using Newtonsoft.Json.Converters;
 using UnityEngine;
-using Mediasoup.Ortc;
-using System.Security.Cryptography;
 using System.Runtime.Serialization;
 
 /// <summary>
@@ -235,7 +230,7 @@ namespace Mediasoup.Transports
 
             return awaitQueue.Push(async () =>
             {
-                await handlerInterface.RestartIce(iceParameters);
+                //await handlerInterface.RestartIce(iceParameters);
                 return new object();
 
             }, "transport.RestartIceAsync");
@@ -254,7 +249,7 @@ namespace Mediasoup.Transports
 
             _ = awaitQueue.Push<bool>(async () =>
             {
-                await handlerInterface.UpdateIceServers(iceServers);
+                //await handlerInterface.UpdateIceServers(iceServers);
                 return true;
 
             }, "transport.UpdateIceServers");
@@ -315,6 +310,7 @@ namespace Mediasoup.Transports
                     RtpEncodingParameters normalizedEncoding = new RtpEncodingParameters { Active = encoding.Active };
 
                     normalizedEncoding.Dtx = encoding.Dtx;
+                    normalizedEncoding.Active = true;
                     normalizedEncoding.ScalabilityMode = encoding.ScalabilityMode;
                     normalizedEncoding.Rid = encoding.Rid;
                     if (encoding.ScaleResolutionDownBy.HasValue)
@@ -333,6 +329,8 @@ namespace Mediasoup.Transports
                     return normalizedEncoding;
                 }).ToList();
             }
+
+            Debug.Log("Transport Produce Codec: " + JsonConvert.SerializeObject(options.codec));
 
             HandlerSendOptions handlerSendOptions = new HandlerSendOptions
             {
@@ -364,8 +362,6 @@ namespace Mediasoup.Transports
 
             _ = await observer.SafeEmit("newproducer", tempproducer);
             return tempproducer;
-
-
         }
 
         public async void ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null,Action<Consumer<AppData>> resultCallback = null)

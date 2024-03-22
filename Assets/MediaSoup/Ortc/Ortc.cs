@@ -20,8 +20,8 @@ namespace Mediasoup.Ortc
 
         private static readonly Regex RtxMimeTypeRegex = new("^.+/rtx$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        private static readonly Regex ProtocolRegex = new Regex("(udp|tcp)", RegexOptions.ECMAScript |  RegexOptions.IgnoreCase);
-        private static readonly Regex TypeRegex = new Regex("(host|srflx|prflx|relay)", RegexOptions.ECMAScript |  RegexOptions.IgnoreCase);
+        private static readonly Regex ProtocolRegex = new Regex("(udp|tcp)", RegexOptions.ECMAScript | RegexOptions.IgnoreCase);
+        private static readonly Regex TypeRegex = new Regex("(host|srflx|prflx|relay)", RegexOptions.ECMAScript | RegexOptions.IgnoreCase);
         private static readonly Regex RoleRegex = new Regex("(auto|client|server)", RegexOptions.ECMAScript | RegexOptions.IgnoreCase);
 
 
@@ -603,13 +603,15 @@ namespace Mediasoup.Ortc
             return caps;
         }
 
-        public static void ValidateIceParameters(IceParameters iceParameters) {
+        public static void ValidateIceParameters(IceParameters iceParameters)
+        {
             string usernameFragmentIt = iceParameters.usernameFragment;
             string passwordIt = iceParameters.password;
             bool iceLiteIt = iceParameters.iceLite;
 
             // usernameFragment is mandatory
-            if (usernameFragmentIt == null) {
+            if (usernameFragmentIt == null)
+            {
                 throw new ArgumentException("ORTC: Missing username Fragment in IceParameters");
             }
 
@@ -620,7 +622,8 @@ namespace Mediasoup.Ortc
             }
         }
 
-        public static void ValidateIceCandidate(IceCandidate candidate) {
+        public static void ValidateIceCandidate(IceCandidate candidate)
+        {
             if (candidate == null)
                 throw new ArgumentNullException(nameof(candidate));
 
@@ -649,16 +652,19 @@ namespace Mediasoup.Ortc
                 throw new ArgumentException("invalid type");
         }
 
-        public static void ValidateIceCandidates(List<IceCandidate> iceCandidates) {
-            if (iceCandidates == null || iceCandidates.Count == 0) {
+        public static void ValidateIceCandidates(List<IceCandidate> iceCandidates)
+        {
+            if (iceCandidates == null || iceCandidates.Count == 0)
+            {
                 throw new ArgumentException("Ice Candidates cannot be null or empty");
             }
 
-            foreach (IceCandidate candidate in iceCandidates) {
+            foreach (IceCandidate candidate in iceCandidates)
+            {
                 ValidateIceCandidate(candidate);
             }
         }
-        
+
         /// <summary>
         /// <para>
         /// Get a mapping in codec payloads and encodings in the given Producer RTP
@@ -1501,20 +1507,24 @@ namespace Mediasoup.Ortc
             return RtpParameters;
         }
 
-        public static List<RtpCodecParameters> ReduceCodecs(List<RtpCodecParameters> codecs, RtpCodecCapability? capCodec) { 
-            
+        public static List<RtpCodecParameters> ReduceCodecs(List<RtpCodecParameters> codecs, RtpCodecCapability capCodec = null)
+        {
+
+            UnityEngine.Debug.Log($"ORTC: CapCodec: {JsonConvert.SerializeObject(capCodec)}");
+
             List<RtpCodecParameters> filteredCodecs = new List<RtpCodecParameters>();
 
-            if (capCodec == null)
+            if (capCodec == null || capCodec.MimeType == null)
             {
                 filteredCodecs.Add(codecs[0]);
 
-                if (codecs[1] != null && IsRtxMimeType(codecs[1].MimeType))
+                if (codecs.Count > 1 && codecs[1] != null && codecs[1].MimeType != null && IsRtxMimeType(codecs[1].MimeType))
                 {
                     filteredCodecs.Add(codecs[1]);
                 }
             }
-            else {
+            else
+            {
                 for (var idx = 0; idx < codecs.Count; ++idx)
                 {
                     //UnityEngine.Debug.Log($"Codec[idx] : {codecs[idx].MimeType}, capcodec {capCodec.MimeType}");
@@ -1522,7 +1532,7 @@ namespace Mediasoup.Ortc
                     {
                         filteredCodecs.Add(codecs[idx]);
 
-                        if (idx == codecs.Count-2) 
+                        if (idx == codecs.Count - 2)
                         {
                             if (codecs != null && IsRtxMimeType(codecs[idx + 1].MimeType))
                             {
@@ -1540,11 +1550,12 @@ namespace Mediasoup.Ortc
                 }
 
             }
-            
+
             return filteredCodecs;
         }
 
-        private static bool IsRtxCodec(RtpCodecCapability codec) {
+        private static bool IsRtxCodec(RtpCodecCapability codec)
+        {
             if (codec == null) return false;
             return IsRtxMimeType(codec.MimeType);
         }
@@ -1601,9 +1612,10 @@ namespace Mediasoup.Ortc
                     RtpCodecCapability matchingLocalRtxCodec = null;
                     foreach (RtpCodecCapability localCodec in localCaps.Codecs)
                     {
-                        if (localCodec != null && IsRtxMimeType(localCodec.MimeType)) {
+                        if (localCodec != null && IsRtxMimeType(localCodec.MimeType))
+                        {
                             byte localAptValue = ExtractApt(localCodec.Parameters["apt"]);
-                            
+
                             if (localAptValue == extendedCodec.localPayloadType)
                             {
                                 matchingLocalRtxCodec = localCodec;
@@ -1708,18 +1720,18 @@ namespace Mediasoup.Ortc
             return reducedRtcpFeedback;
         }
 
-        public static bool CanReceive(RtpParameters rtpParam,ExtendedRtpCapabilities extendedRtpCapabilities) 
+        public static bool CanReceive(RtpParameters rtpParam, ExtendedRtpCapabilities extendedRtpCapabilities)
         {
             ValidateRtpParameters(rtpParam);
 
-            //UnityEngine.Debug.Log("Rtp Paramaeters Codec count: " + rtpParam.Codecs.Count);
+            UnityEngine.Debug.Log("Rtp Paramaeters Codec count: " + rtpParam.Codecs.Count);
 
-            //UnityEngine.Debug.Log("rtpParam: " + JsonConvert.SerializeObject(rtpParam));
+            UnityEngine.Debug.Log("rtpParam: " + JsonConvert.SerializeObject(rtpParam));
 
-            //UnityEngine.Debug.Log("extendedRtpCapabilities: " + JsonConvert.SerializeObject(extendedRtpCapabilities));
+            UnityEngine.Debug.Log("extendedRtpCapabilities: " + JsonConvert.SerializeObject(extendedRtpCapabilities));
 
 
-            if (rtpParam.Codecs.Count==0) 
+            if (rtpParam.Codecs.Count == 0)
             {
                 return false;
             }
@@ -1730,19 +1742,19 @@ namespace Mediasoup.Ortc
 
         }
 
-        public static RtpParameters GenerateProbatorRtpParameters(RtpParameters videoRtpParameters) 
+        public static RtpParameters GenerateProbatorRtpParameters(RtpParameters videoRtpParameters)
         {
             RtpParameters result = Utils.Clone(videoRtpParameters);
 
             ValidateRtpParameters(result);
 
-            RtpParameters rtpParameters = new RtpParameters 
+            RtpParameters rtpParameters = new RtpParameters
             {
                 Mid = "probator",
                 Codecs = new List<RtpCodecParameters>(),
                 HeaderExtensions = new List<RtpHeaderExtensionParameters>(),
-                Encodings = new List<RtpEncodingParameters> { new RtpEncodingParameters {Ssrc = 1234 } },
-                Rtcp = new RtcpParameters {CNAME = "probator" }
+                Encodings = new List<RtpEncodingParameters> { new RtpEncodingParameters { Ssrc = 1234 } },
+                Rtcp = new RtcpParameters { CNAME = "probator" }
             };
 
             rtpParameters.Codecs.Add(videoRtpParameters.Codecs[0]);
@@ -1752,7 +1764,8 @@ namespace Mediasoup.Ortc
             return rtpParameters;
         }
 
-        private static byte ExtractApt(object apt) {
+        private static byte ExtractApt(object apt)
+        {
             byte localAptValue;
             if (apt.IsNumericType())
             {
@@ -1760,7 +1773,7 @@ namespace Mediasoup.Ortc
             }
             else
             {
-                if (!byte.TryParse((string)apt , out localAptValue))
+                if (!byte.TryParse((string)apt, out localAptValue))
                 {
                     throw new InvalidCastException("GetExtendedRtpCapabilities(): Cannot parse apt");
                 }

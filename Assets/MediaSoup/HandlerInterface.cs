@@ -14,6 +14,9 @@ using Mediasoup;
 using System.Linq;
 using Newtonsoft.Json;
 using Cysharp.Threading.Tasks;
+using System.Xml;
+using System.IO;
+using static UnityEditor.Progress;
 
 public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 {
@@ -40,6 +43,9 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     private bool _hasDataChannelMediaSection = false;
     private int _nextSendSctpStreamId = 0;
     private bool _transportReady = false;
+    string username = null;
+    private List<IceCandidate> iceCandidates = new();
+    private IceParameters iceParameters = null;
 
     public HandlerInterface(string name)
     {
@@ -75,12 +81,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
     public async Task<RtpCapabilities> GetNativeRtpCapabilities()
     {
-        RTCConfiguration config = new RTCConfiguration
-        {
-            iceServers = new RTCIceServer[0],
-            iceTransportPolicy = RTCIceTransportPolicy.All,
-            bundlePolicy = RTCBundlePolicy.BundlePolicyMaxBundle
-        };
+        RTCConfiguration config = default;
+        config.iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } };
 
         pc = new RTCPeerConnection(ref config);
 
@@ -116,6 +118,35 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         return sctpCapabilities;
     }
 
+    public RTCIceCandidateInit ConvertMediasoupToUnityIceCandidate(IceCandidate mediasoupCandidate, IceParameters iceParameters)
+    {
+        RTCIceCandidateInit unityCandidate = new RTCIceCandidateInit();
+
+        //Debug.Log($"Foundation: {mediasoupCandidate.foundation}, Port: {mediasoupCandidate.port}, Protocol: {mediasoupCandidate.protocol}, Priority: {mediasoupCandidate.priority}, Address: {mediasoupCandidate.address}, Type: {mediasoupCandidate.type}, TcpType: {mediasoupCandidate.tcpType}");
+
+        // Construct the candidate string
+        string candidateString = $"candidate:{mediasoupCandidate.foundation} 1 {mediasoupCandidate.protocol} {mediasoupCandidate.priority} {mediasoupCandidate.address} {(mediasoupCandidate.protocol == "tcp" ? 9 : mediasoupCandidate.port)} typ {mediasoupCandidate.type}";
+
+
+        // Add TCP type if available
+        if (!string.IsNullOrEmpty(mediasoupCandidate.tcpType))
+        {
+            candidateString += $" tcptype active";
+        }
+
+        candidateString += $" generation 0 ufrag {username}";
+
+        Debug.Log($"Candidate String: {candidateString}");
+        // Assign the constructed candidate string
+        unityCandidate.candidate = candidateString;
+
+        // Set sdpMid and sdpMLineIndex to null as they are optional and not provided by Mediasoup
+        unityCandidate.sdpMid = "0";
+        unityCandidate.sdpMLineIndex = 0;
+
+        return unityCandidate;
+    }
+
     public virtual void Run(HandlerRunOptions options)
     {
         AssertNotClosed();
@@ -128,6 +159,9 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             null,
             false
         );
+
+        iceCandidates = options.iceCandidates;
+        iceParameters = options.iceParameters;
 
         Debug.Log("Remote SDP Run: " + JsonConvert.SerializeObject(options.extendedRtpCapabilities));
 
@@ -142,17 +176,14 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             _forcedLocalDtlsRole = options.dtlsParameters.role == DtlsRole.server ? DtlsRole.server : DtlsRole.client;
         }
 
-        RTCConfiguration config = new RTCConfiguration
-        {
-            iceServers = new RTCIceServer[0],
-            iceTransportPolicy = RTCIceTransportPolicy.All,
-            bundlePolicy = RTCBundlePolicy.BundlePolicyMaxBundle,
-        };
+        RTCConfiguration config = default;
+        config.iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } };
 
         pc = new RTCPeerConnection(ref config);
 
         pc.OnIceGatheringStateChange += (state) =>
         {
+            Debug.Log($"ice gathering state changed to : {state}");
             _ = Emit("@icegatheringstatechange", state);
         };
 
@@ -162,8 +193,9 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             _ = Emit("@connectionstatechange", state);
         };
 
-        pc.OnIceConnectionChange += (state) =>
+        pc.OnIceConnectionChange += async (state) =>
         {
+            Debug.Log($"ice connection state changed to : {state}");
             switch (state)
             {
                 case RTCIceConnectionState.Checking:
@@ -187,6 +219,17 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
                     _ = Emit("@connectionstatechange", "closed");
                     break;
             }
+        };
+
+        pc.OnIceCandidate += async (RTCIceCandidate c) =>
+        {
+            Debug.Log($"Ice Candidate Added: Canidate: {c.Candidate}, Address: {c.Address}, port: {c.Port}, username: {c.UserNameFragment}");
+            if (username == null) username = c.UserNameFragment;
+        };
+
+        pc.OnNegotiationNeeded += async () =>
+        {
+            Debug.Log("Ice Negotiation Needed");
         };
 
     }
@@ -249,9 +292,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
             Debug.Log($"Is IceRestart Completed: {iceRestartOP.IsDone}, Error: {(iceRestartOP.IsError ? iceRestartOP.Error : "No Error")}");
             Debug.Log($"PC SignalingState State ${pc.SignalingState}");
-
         }
-
     }
 
     public virtual async Task<RTCStatsReport> GetTransportStats()
@@ -296,8 +337,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         }
 
         RtpParameters sendingRtpParameters = Utils.Clone(_sendingRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
-        Debug.Log("Sending RTP Parameters: " + JsonConvert.SerializeObject(sendingRtpParameters));
         sendingRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRtpParameters.Codecs, options.codec);
+        Debug.Log("Sending RTP Parameters: " + JsonConvert.SerializeObject(sendingRtpParameters));
 
         RtpParameters sendingRemoteRtpParameters = Utils.Clone(_sendingRemoteRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
         sendingRemoteRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRemoteRtpParameters.Codecs, options.codec);
@@ -308,12 +349,10 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         RTCRtpTransceiverInit transceiverInit = new RTCRtpTransceiverInit
         {
-            streams = new MediaStream[1],
+            streams = new MediaStream[] { sendStream },
             sendEncodings = options.GetRTCRtpTransceivers(options.encodings),
+            direction = RTCRtpTransceiverDirection.SendOnly,
         };
-
-        transceiverInit.direction = RTCRtpTransceiverDirection.SendOnly;
-        transceiverInit.streams[0] = sendStream;
 
         RTCRtpTransceiver transceiver = pc.AddTransceiver(options.track, transceiverInit);
 
@@ -329,7 +368,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             SetupTransport(localRole, localSdp);
         }
 
-        //Debug.Log($"SetLocalDescriptionAsync");
+        Debug.Log($"SetLocalDescriptionAsync");
 
         var localDescSetupOp = await SetLocalDescriptionAsync(pc, offer.Desc);
 
@@ -343,7 +382,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         sendingRtpParameters.Mid = localId;
 
         localSdp = pc.LocalDescription.sdp.ToSdp();
-
 
         Debug.Log($"PC State: {pc.SignalingState.ToString()}");
 
@@ -372,20 +410,24 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         }
         else
         {
+            Debug.Log("Otherwise Encoding");
             sendingRtpParameters.Encodings = options.encodings;
+            Debug.Log("New Encodings: " + JsonConvert.SerializeObject(sendingRtpParameters.Encodings));
         }
 
         remoteSdp.Send(offerMediaObject, mediaSectionIdx.Item2, sendingRtpParameters, sendingRemoteRtpParameters, options.codecOptions, true);
 
         Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
 
+        string remoteSdpFlat = remoteSdp.GetSdp();
+
         RTCSessionDescription sessionDescription = new RTCSessionDescription
         {
             type = RTCSdpType.Answer,
-            sdp = remoteSdp.GetSdp()
+            sdp = remoteSdpFlat
         };
 
-        Debug.Log("Remote SDP: " + remoteSdp.GetSdp());
+        Debug.Log("Remote SDP: " + remoteSdpFlat);
 
         Debug.Log($"Session Description: {sessionDescription.sdp}");
         Debug.Log($"PC State complete: {pc.SignalingState}");
@@ -397,8 +439,27 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         Debug.Log($"PC State complete: {pc.SignalingState}");
 
+        var stats = await GetPcStats(pc);
+        string statsString = JsonConvert.SerializeObject(stats);
+
+        Debug.Log("Streaming Assets PAth: " + Application.streamingAssetsPath);
+
+        Debug.Log("Manually adding ice candidates: ");
+
+
+        foreach (IceCandidate candidate in iceCandidates)
+        {
+            RTCIceCandidateInit init = ConvertMediasoupToUnityIceCandidate(candidate, iceParameters);
+            RTCIceCandidate iceCandidate = new RTCIceCandidate(init);
+            bool isIceCandidateAdded = pc.AddIceCandidate(iceCandidate);
+            Debug.Log($"IceCandidate: {iceCandidate}, Candidate: {iceCandidate.Candidate}, Type: {iceCandidate.Type}, Address: {iceCandidate.Address}, port: {iceCandidate.Port}, username: {iceCandidate.UserNameFragment}, isIceCandidateAddded: {isIceCandidateAdded}, ");
+        }
+
+        File.WriteAllText(Application.streamingAssetsPath + "/stats2.json", statsString);
         // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
+
+        Debug.Log($"Sending RTP Parameters: {JsonConvert.SerializeObject(sendingRtpParameters)}");
 
         HandlerSendResult result = new HandlerSendResult
         {
@@ -667,7 +728,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         Sdp localSdpObject = answer.Desc.sdp.ToSdp();
 
-        Debug.Log("Answer SDP: " + localSdpObject);
+        Debug.Log("Answer SDP: " + answer.Desc.sdp);
 
         foreach (HandlerReceiveOptions options in optionsList)
         {
@@ -888,14 +949,18 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     }
     async UniTask<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
     {
-        RTCSessionDescriptionAsyncOperation offer = peerConnection.CreateOffer();
+        RTCOfferAnswerOptions options = new RTCOfferAnswerOptions();
+        options.iceRestart = true;
+        RTCSessionDescriptionAsyncOperation offer = peerConnection.CreateOffer(ref options);
         var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(offer);
         await wrapper.WaitForCompletionAsync();
         return offer;
     }
     async UniTask<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
     {
-        RTCSessionDescriptionAsyncOperation answer = peerConnection.CreateAnswer();
+        RTCOfferAnswerOptions options = new RTCOfferAnswerOptions();
+        options.iceRestart = true;
+        RTCSessionDescriptionAsyncOperation answer = peerConnection.CreateAnswer(ref options);
         var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(answer);
         await wrapper.WaitForCompletionAsync();
         return answer;
@@ -976,6 +1041,7 @@ public class HandlerSendOptions
             temp.rid = rtp.Rid;
             if (rtp.ScaleResolutionDownBy.HasValue)
                 temp.scaleResolutionDownBy = rtp.ScaleResolutionDownBy;
+            temp.active = true;
             rtpEncoding.Add(temp);
         }
         return rtpEncoding.ToArray();
@@ -1040,7 +1106,7 @@ public class RTCSetSessionDescriptionAsyncOperationWrapper
     {
         while (!operation.IsDone)
         {
-            await Task.Delay(100); // Adjust delay as necessary
+            await Task.Delay(10); // Adjust delay as necessary
         }
 
         IsDone = true;
@@ -1070,7 +1136,7 @@ public class RTCSessionDescriptionAsyncOperationWrapper
     {
         while (!operation.IsDone)
         {
-            await Task.Delay(100); // Adjust delay as necessary
+            await Task.Delay(10); // Adjust delay as necessary
         }
 
         IsDone = true;
