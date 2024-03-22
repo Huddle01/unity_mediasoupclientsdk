@@ -14,9 +14,7 @@ using Mediasoup;
 using System.Linq;
 using Newtonsoft.Json;
 using Cysharp.Threading.Tasks;
-using System.Xml;
 using System.IO;
-using static UnityEditor.Progress;
 
 public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 {
@@ -410,9 +408,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         }
         else
         {
-            Debug.Log("Otherwise Encoding");
             sendingRtpParameters.Encodings = options.encodings;
-            Debug.Log("New Encodings: " + JsonConvert.SerializeObject(sendingRtpParameters.Encodings));
         }
 
         remoteSdp.Send(offerMediaObject, mediaSectionIdx.Item2, sendingRtpParameters, sendingRemoteRtpParameters, options.codecOptions, true);
@@ -442,10 +438,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         var stats = await GetPcStats(pc);
         string statsString = JsonConvert.SerializeObject(stats);
 
-        Debug.Log("Streaming Assets PAth: " + Application.streamingAssetsPath);
-
         Debug.Log("Manually adding ice candidates: ");
-
 
         foreach (IceCandidate candidate in iceCandidates)
         {
@@ -1089,6 +1082,7 @@ public class HandlerEvents
 
 }
 
+// TODO: Remove this crap as soon as possible after POC is ready
 public class RTCSetSessionDescriptionAsyncOperationWrapper
 {
     private readonly RTCSetSessionDescriptionAsyncOperation operation;
@@ -1106,7 +1100,7 @@ public class RTCSetSessionDescriptionAsyncOperationWrapper
     {
         while (!operation.IsDone)
         {
-            await Task.Delay(10); // Adjust delay as necessary
+            await Task.Delay(10);
         }
 
         IsDone = true;
@@ -1136,7 +1130,7 @@ public class RTCSessionDescriptionAsyncOperationWrapper
     {
         while (!operation.IsDone)
         {
-            await Task.Delay(10); // Adjust delay as necessary
+            await Task.Delay(10);
         }
 
         IsDone = true;

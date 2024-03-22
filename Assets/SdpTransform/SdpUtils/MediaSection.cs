@@ -60,8 +60,6 @@ public class MediaSection
 
                 if (!string.IsNullOrEmpty(candi.tcpType))
                 {
-                    //candidateObject.TCPType = candi.tcpType;
-
                     candidateObject.TCPType = candi.tcpType;
                 }
 

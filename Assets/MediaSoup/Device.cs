@@ -8,8 +8,6 @@ using System.Collections.Generic;
 using Mediasoup.Transports;
 using Mediasoup.Types;
 using System.Threading.Tasks;
-using System.Diagnostics;
-using static Unity.WebRTC.Huddle01.SDK.WebRTCClient;
 
 namespace Mediasoup 
 {
