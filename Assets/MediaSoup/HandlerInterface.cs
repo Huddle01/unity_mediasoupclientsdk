@@ -80,8 +80,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     public async Task<RtpCapabilities> GetNativeRtpCapabilities()
     {
         RTCConfiguration config = default;
-        config.iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } };
-
+        
         pc = new RTCPeerConnection(ref config);
 
         if (pc == null) { Debug.Log("pc is null"); }
@@ -223,6 +222,9 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         {
             Debug.Log($"Ice Candidate Added: Canidate: {c.Candidate}, Address: {c.Address}, port: {c.Port}, username: {c.UserNameFragment}");
             if (username == null) username = c.UserNameFragment;
+
+            pc.AddIceCandidate(c);
+
         };
 
         pc.OnNegotiationNeeded += async () =>

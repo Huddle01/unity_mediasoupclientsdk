@@ -210,7 +210,7 @@ public class AnswerMediaSection : MediaSection
                     _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
                     _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
                     _mediaObject.Attributes.Fmtps = new List<Fmtp>();
-                    _mediaObject.ExtraParam = new List<string>();
+                    _mediaObject.Fmts = new List<string>();
 
                     if (_answerRtp != null)
                     {
@@ -443,7 +443,7 @@ public class AnswerMediaSection : MediaSection
                                 }
 
                                 Fmtp fmtp = new Fmtp { PayloadType = codec.PayloadType, Value = "" };
-
+                                _mediaObject.Fmts.Add(codec.PayloadType.ToString());
                                 foreach (var key in codecParameters.Keys)
                                 {
                                     //Debug.Log("MediaSection CodecParameter Key: " + key + $" value {codecParameters[key]}");
@@ -461,8 +461,6 @@ public class AnswerMediaSection : MediaSection
                                 if (!string.IsNullOrEmpty(fmtp.Value))
                                 {
                                     _mediaObject.Attributes.Fmtps.Add(fmtp);
-                                    _mediaObject.Fmts.Add(fmtp.PayloadType.ToString());
-                                    _mediaObject.ExtraParam.Add(fmtp.PayloadType.ToString());
                                 }
 
                                 foreach (var fb in codecRtcpFeedback)
@@ -645,6 +643,8 @@ public class OfferMediaSection : MediaSection
                               MediaKind _mediaKind, RtpParameters _offerRtp, string _streamId, string _trackId, bool _oldDataChannelSpec = false) :
                                 base(_iceParameters, _iceCandidates, _dtlsParameters, _planB)
     {
+        Debug.Log($"RTP param for offers : {JsonConvert.SerializeObject(_offerRtp)}");
+
         Debug.Log("OfferMediaSection | cons() | ");
         if (_mediaObject == null)
         {
@@ -722,6 +722,7 @@ public class OfferMediaSection : MediaSection
                 _mediaObject.Attributes.Rtpmaps = new List<Rtpmap>();
                 _mediaObject.Attributes.RtcpFbs = new List<RtcpFb>();
                 _mediaObject.Attributes.Fmtps = new List<Fmtp>();
+                _mediaObject.Fmts = new List<string>();
                 _mediaObject.Attributes.SendOnly = true;
 
                 if (!_planB)
@@ -755,26 +756,30 @@ public class OfferMediaSection : MediaSection
 
                         Fmtp fmtp = new Fmtp { PayloadType = codec.PayloadType, Value = "" };
 
-                        //Debug.Log($"OfferMediaSection | cons() | codec.payloadType: {codec.PayloadType}");
+                        Debug.Log($"OfferMediaSection | cons() | codec.payloadType: {codec.PayloadType}");
+
+                        _mediaObject.Fmts.Add(codec.PayloadType.ToString());
 
                         foreach (var key in codec.Parameters.Keys)
                         {
-                            if (fmtp.Value.Length > 0)
+                            if (!string.IsNullOrEmpty(fmtp.Value))
                             {
-                                fmtp.Value.Append(';');
+                                fmtp.Value += ";";
                             }
 
                             fmtp.Value += $"{key}={codec.Parameters[key]}";
                         }
 
-                        //Debug.Log($"OfferMediaSection | cons() | fmtp.Value is null: {string.IsNullOrEmpty(fmtp.Value)}");
+                        Debug.Log($"OfferMediaSection | cons() | fmtp.Value is null: {string.IsNullOrEmpty(fmtp.Value)}");
 
 
                         if (!string.IsNullOrEmpty(fmtp.Value))
                         {
+                            Debug.Log($"FMTP value {fmtp.Value}");
                             _mediaObject.Attributes.Fmtps.Add(fmtp);
                             if (_mediaObject.Fmts == null) _mediaObject.Fmts = new List<string>();
-                            _mediaObject.Fmts.Add(fmtp.PayloadType.ToString());
+                            
+
                         }
 
                         //Debug.Log($"OfferMediaSection | cons() | fmtp.Value: {fmtp.Value}");
