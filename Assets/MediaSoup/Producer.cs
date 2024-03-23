@@ -300,7 +300,7 @@ namespace Mediasoup
         public List<RtpEncodingParameters> encodings { get; set; } = new List<RtpEncodingParameters>();
 
         public ProducerCodecOptions codecOptions = new ProducerCodecOptions();
-        public RtpCodecCapability codec = new RtpCodecCapability();
+        public RtpCodecCapability codec = null;
         public bool stopTracks;
         public bool disableTrackOnPause;
         public bool zeroRtpOnPause;

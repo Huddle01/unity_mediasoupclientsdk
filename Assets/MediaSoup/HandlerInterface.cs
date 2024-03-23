@@ -14,7 +14,6 @@ using Mediasoup;
 using System.Linq;
 using Newtonsoft.Json;
 using Cysharp.Threading.Tasks;
-using System.IO;
 
 public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 {
@@ -34,7 +33,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     private Dictionary<string, RtpParameters> _sendingRtpParametersByKind = new Dictionary<string, RtpParameters>();
     private Dictionary<string, RtpParameters> _sendingRemoteRtpParametersByKind = new Dictionary<string, RtpParameters>();
 
-    private DtlsRole _forcedLocalDtlsRole;
+    private DtlsRole? _forcedLocalDtlsRole = null;
     private RTCPeerConnection pc;
     private Dictionary<string, RTCRtpTransceiver> _mapMidTransceiver = new Dictionary<string, RTCRtpTransceiver>();
     private readonly MediaStream sendStream;
@@ -80,7 +79,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     public async Task<RtpCapabilities> GetNativeRtpCapabilities()
     {
         RTCConfiguration config = default;
-        
         pc = new RTCPeerConnection(ref config);
 
         if (pc == null) { Debug.Log("pc is null"); }
@@ -107,6 +105,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         // libwebrtc supports NACK for OPUS but doesn't announce it.
         OrtcUtils.AddNackSuppportForOpus(nativeRtpCapabilities);
 
+        pc.Dispose();
+
         return nativeRtpCapabilities;
     }
 
@@ -122,13 +122,13 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         //Debug.Log($"Foundation: {mediasoupCandidate.foundation}, Port: {mediasoupCandidate.port}, Protocol: {mediasoupCandidate.protocol}, Priority: {mediasoupCandidate.priority}, Address: {mediasoupCandidate.address}, Type: {mediasoupCandidate.type}, TcpType: {mediasoupCandidate.tcpType}");
 
         // Construct the candidate string
-        string candidateString = $"candidate:{mediasoupCandidate.foundation} 1 {mediasoupCandidate.protocol} {mediasoupCandidate.priority} {mediasoupCandidate.address} {(mediasoupCandidate.protocol == "tcp" ? 9 : mediasoupCandidate.port)} typ {mediasoupCandidate.type}";
+        string candidateString = $"candidate:{mediasoupCandidate.foundation} 1 {mediasoupCandidate.protocol} {mediasoupCandidate.priority} {mediasoupCandidate.address} {mediasoupCandidate.port} typ {mediasoupCandidate.type}";
 
 
         // Add TCP type if available
         if (!string.IsNullOrEmpty(mediasoupCandidate.tcpType))
         {
-            candidateString += $" tcptype active";
+            candidateString += $" tcptype {mediasoupCandidate.tcpType}";
         }
 
         candidateString += $" generation 0 ufrag {username}";
@@ -170,17 +170,21 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         if (options.dtlsParameters != null && options.dtlsParameters.role != DtlsRole.auto)
         {
-            _forcedLocalDtlsRole = options.dtlsParameters.role == DtlsRole.server ? DtlsRole.server : DtlsRole.client;
+            _forcedLocalDtlsRole = options.dtlsParameters.role == DtlsRole.server ? DtlsRole.client : DtlsRole.server;
         }
 
-        RTCConfiguration config = default;
-        config.iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } };
+        RTCConfiguration config = new RTCConfiguration { 
+            bundlePolicy = RTCBundlePolicy.BundlePolicyMaxBundle,
+        };
+        config.iceTransportPolicy = RTCIceTransportPolicy.All;
 
         pc = new RTCPeerConnection(ref config);
 
+        Debug.Log("Peer connection setupped");
+
         pc.OnIceGatheringStateChange += (state) =>
         {
-            Debug.Log($"ice gathering state changed to : {state}");
+            Debug.Log($"ICE CONNECTION: ice gathering state changed to : {state}");
             _ = Emit("@icegatheringstatechange", state);
         };
 
@@ -192,7 +196,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         pc.OnIceConnectionChange += async (state) =>
         {
-            Debug.Log($"ice connection state changed to : {state}");
+            Debug.Log($"ICE CONNECTION: ice connection state changed to : {state}");
             switch (state)
             {
                 case RTCIceConnectionState.Checking:
@@ -220,16 +224,13 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         pc.OnIceCandidate += async (RTCIceCandidate c) =>
         {
-            Debug.Log($"Ice Candidate Added: Canidate: {c.Candidate}, Address: {c.Address}, port: {c.Port}, username: {c.UserNameFragment}");
+            Debug.Log($"ICE CONNECTION: Ice Candidate Added: Canidate: {c.Candidate}, Address: {c.Address}, port: {c.Port}, username: {c.UserNameFragment}");
             if (username == null) username = c.UserNameFragment;
-
-            pc.AddIceCandidate(c);
-
         };
 
         pc.OnNegotiationNeeded += async () =>
         {
-            Debug.Log("Ice Negotiation Needed");
+            Debug.Log("ICE CONNECTION: Ice Negotiation Needed");
         };
 
     }
@@ -354,7 +355,11 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             direction = RTCRtpTransceiverDirection.SendOnly,
         };
 
+        Debug.Log("Adding Transciever");
+
         RTCRtpTransceiver transceiver = pc.AddTransceiver(options.track, transceiverInit);
+
+        Debug.Log("Generating Offer");
 
         RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
 
@@ -364,7 +369,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         if (!_transportReady)
         {
-            DtlsRole localRole = DtlsRole.client;
+            DtlsRole localRole = _forcedLocalDtlsRole.HasValue ? _forcedLocalDtlsRole.Value : DtlsRole.client;
             SetupTransport(localRole, localSdp);
         }
 
@@ -440,17 +445,17 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         var stats = await GetPcStats(pc);
         string statsString = JsonConvert.SerializeObject(stats);
 
-        Debug.Log("Manually adding ice candidates: ");
+        //Debug.Log("Manually adding ice candidates: ");
 
-        foreach (IceCandidate candidate in iceCandidates)
-        {
-            RTCIceCandidateInit init = ConvertMediasoupToUnityIceCandidate(candidate, iceParameters);
-            RTCIceCandidate iceCandidate = new RTCIceCandidate(init);
-            bool isIceCandidateAdded = pc.AddIceCandidate(iceCandidate);
-            Debug.Log($"IceCandidate: {iceCandidate}, Candidate: {iceCandidate.Candidate}, Type: {iceCandidate.Type}, Address: {iceCandidate.Address}, port: {iceCandidate.Port}, username: {iceCandidate.UserNameFragment}, isIceCandidateAddded: {isIceCandidateAdded}, ");
-        }
+        //foreach (IceCandidate candidate in iceCandidates)
+        //{
+        //    RTCIceCandidateInit init = ConvertMediasoupToUnityIceCandidate(candidate, iceParameters);
+        //    RTCIceCandidate iceCandidate = new RTCIceCandidate(init);
+        //    bool isIceCandidateAdded = pc.AddIceCandidate(iceCandidate);
+        //    Debug.Log($"IceCandidate: {iceCandidate}, Candidate: {iceCandidate.Candidate}, Type: {iceCandidate.Type}, Address: {iceCandidate.Address}, port: {iceCandidate.Port}, username: {iceCandidate.UserNameFragment}, isIceCandidateAddded: {isIceCandidateAdded}, ");
+        //}
 
-        File.WriteAllText(Application.streamingAssetsPath + "/aa/stats2.json", statsString);
+        System.IO.File.WriteAllText(Application.streamingAssetsPath + "/aa/stats2.json", statsString);
         // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
 
@@ -462,6 +467,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             rtpParameters = sendingRtpParameters,
             rtpSender = transceiver.Sender
         };
+
+        Debug.Log("Ice connection state: " + pc.IceConnectionState);
 
         return result;
     }
@@ -903,7 +910,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         }
         DtlsParameters dtlsParameters = CommonUtils.ExtractDtlsParameters(localSdpObject);
         dtlsParameters.role = role;
-        remoteSdp.UpdateDtlsRole(role);
+        if (remoteSdp != null) remoteSdp.UpdateDtlsRole(role == DtlsRole.client ? DtlsRole.server : DtlsRole.client);
         Debug.Log("Emitting @connect");
         Action callBack = DefaultCallback;
         Action<Exception> errBack = ErrBack;

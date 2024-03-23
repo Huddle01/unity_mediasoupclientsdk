@@ -51,6 +51,7 @@ public class UnifiedPlanUtils
 
         foreach (var ssrc in ssrcs)
         {
+            if (ssrcToRtxSsrc.ContainsKey(ssrc)) ssrcToRtxSsrc.Remove(ssrc);
             ssrcToRtxSsrc.Add(ssrc, uint.MaxValue);
         }
 
