@@ -53,20 +53,7 @@ public class TestMediasoupLocally : MonoBehaviour
         {
             encodings = {   new RtpEncodingParameters
                             {
-                                Rid = "r0",
                                 MaxBitrate = 100000,
-                                ScalabilityMode = "S1T3"
-                            },
-                            new RtpEncodingParameters
-                            {
-                                Rid = "r1",
-                                MaxBitrate = 300000,
-                                ScalabilityMode = "S1T3"
-                            },new RtpEncodingParameters
-                            {
-                                Rid = "r2",
-                                MaxBitrate = 900000,
-                                ScalabilityMode = "S1T3"
                             }
                         },
 
@@ -238,6 +225,10 @@ public class TestMediasoupLocally : MonoBehaviour
     {
         RtpParameters rtpParameters = rtp;
 
+        if (ProducerOptionsObj.codec == null) {
+            rtpParameters.Codecs[0].RtcpFeedback = null;
+        }
+        else 
         rtpParameters.Codecs[0].RtcpFeedback = ProducerOptionsObj.codec.RtcpFeedback;
 
         var responseData = new

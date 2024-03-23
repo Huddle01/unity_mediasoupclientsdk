@@ -622,11 +622,11 @@ public class AnswerMediaSection : MediaSection
                 break;
 
             case DtlsRole.server:
-                _mediaObject.Attributes.Setup = new Setup { Role = SetupRole.Active };
+                _mediaObject.Attributes.Setup = new Setup { Role = SetupRole.Passive };
                 break;
 
             case DtlsRole.auto:
-                _mediaObject.Attributes.Setup = new Setup { Role = SetupRole.Active };
+                _mediaObject.Attributes.Setup = new Setup { Role = SetupRole.ActPass };
                 break;
         }
     }
@@ -662,6 +662,7 @@ public class OfferMediaSection : MediaSection
             _mediaObject.Attributes.Mid = new Mid();
         }
         _mediaObject.Attributes.Mid.Id = _mid;
+        if (_mediaObject.Fmts == null) _mediaObject.Fmts = new List<string>();
 
         switch (_mediaKind)
         {
@@ -755,6 +756,7 @@ public class OfferMediaSection : MediaSection
                         _mediaObject.Attributes.Rtpmaps.Add(rtp);
 
                         Fmtp fmtp = new Fmtp { PayloadType = codec.PayloadType, Value = "" };
+                        _mediaObject.Fmts.Add(fmtp.PayloadType.ToString());
 
                         Debug.Log($"OfferMediaSection | cons() | codec.payloadType: {codec.PayloadType}");
 
@@ -777,9 +779,6 @@ public class OfferMediaSection : MediaSection
                         {
                             Debug.Log($"FMTP value {fmtp.Value}");
                             _mediaObject.Attributes.Fmtps.Add(fmtp);
-                            if (_mediaObject.Fmts == null) _mediaObject.Fmts = new List<string>();
-                            
-
                         }
 
                         //Debug.Log($"OfferMediaSection | cons() | fmtp.Value: {fmtp.Value}");
