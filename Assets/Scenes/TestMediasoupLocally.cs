@@ -40,7 +40,7 @@ public class TestMediasoupLocally : MonoBehaviour
 
     private CancellationToken _tokenSource;
 
-    private string _socketUrl = "ws://localhost:8081";
+    private string _socketUrl = "ws://localhost:3001";
 
     private string _producerId;
 
