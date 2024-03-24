@@ -4,7 +4,6 @@ using UnityEngine;
 using Unity.WebRTC;
 using System;
 using Newtonsoft.Json;
-using System.Text.Json;
 using Newtonsoft.Json.Converters;
 using System.Runtime.Serialization;
 

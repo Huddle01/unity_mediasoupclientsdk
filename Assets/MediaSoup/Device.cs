@@ -119,6 +119,15 @@ namespace Mediasoup
             )
         {
 
+            foreach ( var candidate in iceCandidates )
+            {
+                if (candidate.address == "127.0.0.1") {
+                    string ipv4 = IPManager.GetIP(ADDRESSFAM.IPv4);
+                    candidate.address = ipv4;
+                    candidate.ip = ipv4;
+                }
+            }
+
             ORTC.ValidateIceParameters(iceParameters);
             ORTC.ValidateIceCandidates(iceCandidates);
 
@@ -131,6 +140,16 @@ namespace Mediasoup
         public Transport<AppData> CreateRecvTransport(string id, IceParameters iceParameters, List<IceCandidate> iceCandidates,
             DtlsParameters dtlsParameters, SctpParameters sctpParameters, List<RTCIceServer> iceServers, RTCIceTransportPolicy iceTransportPolicy,
             object additionalSettings, object proprietaryConstraints, AppData appData) {
+
+            foreach (var candidate in iceCandidates)
+            {
+                if (candidate.address == "127.0.0.1")
+                {
+                    string ipv4 = IPManager.GetIP(ADDRESSFAM.IPv4);
+                    candidate.address = ipv4;
+                    candidate.ip = ipv4;
+                }
+            }
 
             return new Transport<AppData>("recv", id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
                 iceTransportPolicy, additionalSettings, proprietaryConstraints, appData, handler, extendedRtpCapabilities, canProduceByKind);
