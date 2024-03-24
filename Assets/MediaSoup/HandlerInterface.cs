@@ -14,6 +14,7 @@ using Mediasoup;
 using System.Linq;
 using Newtonsoft.Json;
 using Cysharp.Threading.Tasks;
+using System.Security.Cryptography;
 
 public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 {
@@ -41,8 +42,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     private int _nextSendSctpStreamId = 0;
     private bool _transportReady = false;
     string username = null;
-    private List<IceCandidate> iceCandidates = new();
-    private IceParameters iceParameters = null;
 
     public HandlerInterface(string name)
     {
@@ -79,6 +78,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
     public async Task<RtpCapabilities> GetNativeRtpCapabilities()
     {
         RTCConfiguration config = default;
+        config.iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } };
+
         pc = new RTCPeerConnection(ref config);
 
         if (pc == null) { Debug.Log("pc is null"); }
@@ -115,35 +116,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         return sctpCapabilities;
     }
 
-    public RTCIceCandidateInit ConvertMediasoupToUnityIceCandidate(IceCandidate mediasoupCandidate, IceParameters iceParameters)
-    {
-        RTCIceCandidateInit unityCandidate = new RTCIceCandidateInit();
-
-        //Debug.Log($"Foundation: {mediasoupCandidate.foundation}, Port: {mediasoupCandidate.port}, Protocol: {mediasoupCandidate.protocol}, Priority: {mediasoupCandidate.priority}, Address: {mediasoupCandidate.address}, Type: {mediasoupCandidate.type}, TcpType: {mediasoupCandidate.tcpType}");
-
-        // Construct the candidate string
-        string candidateString = $"candidate:{mediasoupCandidate.foundation} 1 {mediasoupCandidate.protocol} {mediasoupCandidate.priority} {mediasoupCandidate.address} {mediasoupCandidate.port} typ {mediasoupCandidate.type}";
-
-
-        // Add TCP type if available
-        if (!string.IsNullOrEmpty(mediasoupCandidate.tcpType))
-        {
-            candidateString += $" tcptype {mediasoupCandidate.tcpType}";
-        }
-
-        candidateString += $" generation 0 ufrag {username}";
-
-        Debug.Log($"Candidate String: {candidateString}");
-        // Assign the constructed candidate string
-        unityCandidate.candidate = candidateString;
-
-        // Set sdpMid and sdpMLineIndex to null as they are optional and not provided by Mediasoup
-        unityCandidate.sdpMid = "0";
-        unityCandidate.sdpMLineIndex = 0;
-
-        return unityCandidate;
-    }
-
     public virtual void Run(HandlerRunOptions options)
     {
         AssertNotClosed();
@@ -156,9 +128,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             null,
             false
         );
-
-        iceCandidates = options.iceCandidates;
-        iceParameters = options.iceParameters;
 
         Debug.Log("Remote SDP Run: " + JsonConvert.SerializeObject(options.extendedRtpCapabilities));
 
@@ -175,8 +144,9 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         RTCConfiguration config = new RTCConfiguration { 
             bundlePolicy = RTCBundlePolicy.BundlePolicyMaxBundle,
+            iceTransportPolicy = RTCIceTransportPolicy.All,
         };
-        config.iceTransportPolicy = RTCIceTransportPolicy.All;
+        config.iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } };
 
         pc = new RTCPeerConnection(ref config);
 
@@ -346,7 +316,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         Debug.Log("Sending Remote RTP Parameters: " + JsonConvert.SerializeObject(sendingRemoteRtpParameters));
 
         Tuple<int, string> mediaSectionIdx = remoteSdp.GetNextMediaSectionIdx();
-        //Debug.Log($"mediaSectionIdx value {mediaSectionIdx.Item2}");
+        Debug.Log($"mediaSectionIdx value {mediaSectionIdx.Item2}");
 
         RTCRtpTransceiverInit transceiverInit = new RTCRtpTransceiverInit
         {
@@ -359,13 +329,19 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         RTCRtpTransceiver transceiver = pc.AddTransceiver(options.track, transceiverInit);
 
+        //var codecs = RTCRtpSender.GetCapabilities(TrackKind.Video).codecs;
+        //var vp8Codec = codecs.Where(codec => codec.mimeType == "video/VP8");
+        //var error = transceiver.SetCodecPreferences(vp8Codec.ToArray());
+        //if (error != RTCErrorType.None)
+        //    Debug.LogError("SetCodecPreferences failed");
+
         Debug.Log("Generating Offer");
 
         RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
 
         Sdp localSdp = offer.Desc.sdp.ToSdp();
 
-        Debug.Log("Local SDP: " + offer.Desc.sdp);
+        Debug.Log("Local SDP: " + offer.Desc.sdp.Replace("actpass", "passive"));
 
         if (!_transportReady)
         {
@@ -445,17 +421,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         var stats = await GetPcStats(pc);
         string statsString = JsonConvert.SerializeObject(stats);
 
-        //Debug.Log("Manually adding ice candidates: ");
-
-        //foreach (IceCandidate candidate in iceCandidates)
-        //{
-        //    RTCIceCandidateInit init = ConvertMediasoupToUnityIceCandidate(candidate, iceParameters);
-        //    RTCIceCandidate iceCandidate = new RTCIceCandidate(init);
-        //    bool isIceCandidateAdded = pc.AddIceCandidate(iceCandidate);
-        //    Debug.Log($"IceCandidate: {iceCandidate}, Candidate: {iceCandidate.Candidate}, Type: {iceCandidate.Type}, Address: {iceCandidate.Address}, port: {iceCandidate.Port}, username: {iceCandidate.UserNameFragment}, isIceCandidateAddded: {isIceCandidateAdded}, ");
-        //}
-
-        System.IO.File.WriteAllText(Application.streamingAssetsPath + "/aa/stats2.json", statsString);
         // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
 

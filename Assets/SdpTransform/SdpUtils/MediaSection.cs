@@ -68,8 +68,8 @@ public class MediaSection
             }
 
             _mediaObject.Attributes.EndOfCandidates = true;
-            _mediaObject.Attributes.IceOptions = new IceOptions { Tags = Enumerable.Repeat("renomination", 1).ToArray() };
-            //_mediaObject.Attributes.IceOptions = new IceOptions { Tags = Enumerable.Repeat("trickle", 1).ToArray() };
+
+            _mediaObject.Attributes.IceOptions = new IceOptions { Tags = new string[] { "renomination" } };
 
             if (_dtlsParameters != null) { SetDtlsRole(_dtlsParameters.role); }
 
@@ -756,7 +756,6 @@ public class OfferMediaSection : MediaSection
                         _mediaObject.Attributes.Rtpmaps.Add(rtp);
 
                         Fmtp fmtp = new Fmtp { PayloadType = codec.PayloadType, Value = "" };
-                        _mediaObject.Fmts.Add(fmtp.PayloadType.ToString());
 
                         Debug.Log($"OfferMediaSection | cons() | codec.payloadType: {codec.PayloadType}");
 

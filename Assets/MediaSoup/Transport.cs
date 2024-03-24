@@ -614,7 +614,7 @@ namespace Mediasoup.Transports
                     consumers.Add(tempConsumer.id, tempConsumer);
                     HandleConsumer(tempConsumer);
 
-                    if (!_probatorConsumerCreated && videoConsumerForProbator != null && tempkind == "video")
+                    if (!_probatorConsumerCreated && videoConsumerForProbator == null && tempkind == "video")
                     {
                         videoConsumerForProbator = tempConsumer;
                     }
@@ -623,7 +623,6 @@ namespace Mediasoup.Transports
 
                     task.ResolveConsumer(tempConsumer);
                     resultCallback.Invoke(tempConsumer);
-
                 }
 
             }
