@@ -10,7 +10,6 @@ using Mediasoup.SctpParameter;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Utilme.SdpTransform;
-using Cysharp.Threading.Tasks;
 using Mediasoup.Internal;
 
 namespace Unity.WebRTC.Huddle01.SDK
@@ -360,48 +359,42 @@ namespace Unity.WebRTC.Huddle01.SDK
             throw exception;
         }
 
-        async UniTask<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
+        IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
         {
-            RTCSessionDescriptionAsyncOperation offer = peerConnection.CreateOffer();
-            var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(offer);
-            await wrapper.WaitForCompletionAsync();
-            return offer;
+            RTCOfferAnswerOptions options = new RTCOfferAnswerOptions();
+            options.iceRestart = true;
+            RTCSessionDescriptionAsyncOperation offer = peerConnection.CreateOffer(ref options);
+            yield return offer;
         }
-        async UniTask<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
+        IEnumerator<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
         {
-            RTCSessionDescriptionAsyncOperation answer = peerConnection.CreateAnswer();
-            var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(answer);
-            await wrapper.WaitForCompletionAsync();
-            return answer;
+            RTCOfferAnswerOptions options = new RTCOfferAnswerOptions();
+            options.iceRestart = true;
+            RTCSessionDescriptionAsyncOperation answer = peerConnection.CreateAnswer(ref options);
+            yield return answer;
         }
-        async UniTask<RTCSessionDescriptionAsyncOperation> CreateOfferIceRestartAsync(RTCPeerConnection peerConnection)
-        {
 
+        IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferIceRestartAsync(RTCPeerConnection peerConnection)
+        {
             RTCOfferAnswerOptions options = new RTCOfferAnswerOptions
             {
                 iceRestart = true
             };
 
             RTCSessionDescriptionAsyncOperation _offer = peerConnection.CreateOffer(ref options);
-            var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(_offer);
-            await wrapper.WaitForCompletionAsync();
-            return _offer;
+            yield return _offer;
         }
 
-        async UniTask<RTCSetSessionDescriptionAsyncOperation> SetLocalDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription offerDesc)
+        IEnumerator<RTCSetSessionDescriptionAsyncOperation> SetLocalDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription offerDesc)
         {
             RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetLocalDescription(ref offerDesc);
-            var wrapper = new RTCSetSessionDescriptionAsyncOperationWrapper(localDesc);
-            await wrapper.WaitForCompletionAsync();
-            return localDesc;
+            yield return localDesc;
         }
 
-        async UniTask<RTCSetSessionDescriptionAsyncOperation> SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
+        IEnumerator<RTCSetSessionDescriptionAsyncOperation> SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
         {
             RTCSetSessionDescriptionAsyncOperation remoteDesc = peerConnection.SetRemoteDescription(ref sessionDescription);
-            var wrapper = new RTCSetSessionDescriptionAsyncOperationWrapper(remoteDesc);
-            await wrapper.WaitForCompletionAsync();
-            return remoteDesc;
+            yield return remoteDesc;
         }
 
         IEnumerator<RTCStatsReportAsyncOperation> GetPcStats(RTCPeerConnection peerConnection)
