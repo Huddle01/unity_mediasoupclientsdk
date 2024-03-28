@@ -344,6 +344,7 @@ namespace Mediasoup.Transports
 
             Producer<ProducerAppData> tempproducer = null;
 
+            Debug.Log("Handler Send Result RTP: " + JsonConvert.SerializeObject(handlerSendResult.rtpParameters));
 
             ORTC.ValidateRtpParameters(handlerSendResult.rtpParameters);
             _ = await SafeEmit("produce", options.track.Kind, handlerSendResult.rtpParameters);

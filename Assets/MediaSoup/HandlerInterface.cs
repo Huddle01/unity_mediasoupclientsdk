@@ -329,12 +329,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         RTCRtpTransceiver transceiver = pc.AddTransceiver(options.track, transceiverInit);
 
-        //var codecs = RTCRtpSender.GetCapabilities(TrackKind.Video).codecs;
-        //var vp8Codec = codecs.Where(codec => codec.mimeType == "video/VP8");
-        //var error = transceiver.SetCodecPreferences(vp8Codec.ToArray());
-        //if (error != RTCErrorType.None)
-        //    Debug.LogError("SetCodecPreferences failed");
-
         Debug.Log("Generating Offer");
 
         RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
@@ -417,9 +411,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         Debug.Log($"remoteSdbSetupOp complete: {remoteSdbSetupOp.IsDone}, Error: {remoteSdbSetupOp.Error.message}");
 
         Debug.Log($"PC State complete: {pc.SignalingState}");
-
-        var stats = await GetPcStats(pc);
-        string statsString = JsonConvert.SerializeObject(stats);
 
         // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
@@ -1002,12 +993,12 @@ public class HandlerSendOptions
         {
             RTCRtpEncodingParameters temp = new RTCRtpEncodingParameters();
             if (rtp.MaxBitrate.HasValue)
-                temp.maxBitrate = (ulong)rtp.MaxBitrate.Value;
+                temp.maxBitrate = rtp.MaxBitrate.Value;
             if (rtp.MaxFramerate.HasValue)
-                temp.maxFramerate = (uint)rtp.MaxFramerate.Value;
-            temp.rid = rtp.Rid;
+                temp.maxFramerate = rtp.MaxFramerate.Value;
             if (rtp.ScaleResolutionDownBy.HasValue)
                 temp.scaleResolutionDownBy = rtp.ScaleResolutionDownBy;
+            temp.rid = rtp.Rid;
             temp.active = true;
             rtpEncoding.Add(temp);
         }
