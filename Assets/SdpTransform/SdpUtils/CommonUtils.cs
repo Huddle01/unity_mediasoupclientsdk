@@ -72,8 +72,12 @@ public class CommonUtils
 
                     if (keyValue.Length == 2)
                     {
+                        if (keyValue[0] == "packetization-mode")
+                        {
+                            parameters.Add(keyValue[0], int.Parse(keyValue[1]));
+                        }
                         // Add to the dictionary
-                        parameters.Add(keyValue[0].Trim(), keyValue[1].Trim());
+                        else parameters.Add(keyValue[0].Trim(), keyValue[1].Trim());
                     }
                 }
 

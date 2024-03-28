@@ -239,13 +239,6 @@ public class TestMediasoupLocally : MonoBehaviour
     {
         RtpParameters rtpParameters = rtp;
 
-        if (ProducerOptionsObj.codec == null)
-        {
-            rtpParameters.Codecs[0].RtcpFeedback = null;
-        }
-        else
-            rtpParameters.Codecs[0].RtcpFeedback = ProducerOptionsObj.codec.RtcpFeedback;
-
         var responseData = new
         {
             transportId = SendTransport.id,
