@@ -13,7 +13,6 @@ using Mediasoup.Internal;
 using Mediasoup;
 using System.Linq;
 using Newtonsoft.Json;
-using Cysharp.Threading.Tasks;
 using System.Security.Cryptography;
 
 public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
@@ -914,52 +913,42 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             throw new InvalidOperationException("Method can only be called for handlers with 'recv' direction");
         }
     }
-    async UniTask<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
+    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferAsync(RTCPeerConnection peerConnection)
     {
         RTCOfferAnswerOptions options = new RTCOfferAnswerOptions();
         options.iceRestart = true;
         RTCSessionDescriptionAsyncOperation offer = peerConnection.CreateOffer(ref options);
-        var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(offer);
-        await wrapper.WaitForCompletionAsync();
-        return offer;
+        yield return offer;
     }
-    async UniTask<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
+    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateAnswerAsync(RTCPeerConnection peerConnection)
     {
         RTCOfferAnswerOptions options = new RTCOfferAnswerOptions();
         options.iceRestart = true;
         RTCSessionDescriptionAsyncOperation answer = peerConnection.CreateAnswer(ref options);
-        var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(answer);
-        await wrapper.WaitForCompletionAsync();
-        return answer;
+        yield return answer;
     }
-    async UniTask<RTCSessionDescriptionAsyncOperation> CreateOfferIceRestartAsync(RTCPeerConnection peerConnection)
-    {
 
+    IEnumerator<RTCSessionDescriptionAsyncOperation> CreateOfferIceRestartAsync(RTCPeerConnection peerConnection)
+    {
         RTCOfferAnswerOptions options = new RTCOfferAnswerOptions
         {
             iceRestart = true
         };
 
         RTCSessionDescriptionAsyncOperation _offer = peerConnection.CreateOffer(ref options);
-        var wrapper = new RTCSessionDescriptionAsyncOperationWrapper(_offer);
-        await wrapper.WaitForCompletionAsync();
-        return _offer;
+        yield return _offer;
     }
 
-    async UniTask<RTCSetSessionDescriptionAsyncOperation> SetLocalDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription offerDesc)
+    IEnumerator<RTCSetSessionDescriptionAsyncOperation> SetLocalDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription offerDesc)
     {
         RTCSetSessionDescriptionAsyncOperation localDesc = peerConnection.SetLocalDescription(ref offerDesc);
-        var wrapper = new RTCSetSessionDescriptionAsyncOperationWrapper(localDesc);
-        await wrapper.WaitForCompletionAsync();
-        return localDesc;
+        yield return localDesc;
     }
 
-    async UniTask<RTCSetSessionDescriptionAsyncOperation> SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
+    IEnumerator<RTCSetSessionDescriptionAsyncOperation> SetRemoteDescriptionAsync(RTCPeerConnection peerConnection, RTCSessionDescription sessionDescription)
     {
         RTCSetSessionDescriptionAsyncOperation remoteDesc = peerConnection.SetRemoteDescription(ref sessionDescription);
-        var wrapper = new RTCSetSessionDescriptionAsyncOperationWrapper(remoteDesc);
-        await wrapper.WaitForCompletionAsync();
-        return remoteDesc;
+        yield return remoteDesc;
     }
 
     IEnumerator<RTCStatsReportAsyncOperation> GetPcStats(RTCPeerConnection peerConnection)
@@ -1054,65 +1043,4 @@ public class HandlerReceiveDataChannelOptions
 public class HandlerEvents
 {
 
-}
-
-// TODO: Remove this crap as soon as possible after POC is ready
-public class RTCSetSessionDescriptionAsyncOperationWrapper
-{
-    private readonly RTCSetSessionDescriptionAsyncOperation operation;
-    private readonly TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-
-    public bool IsDone { get; private set; }
-
-    public RTCSetSessionDescriptionAsyncOperationWrapper(RTCSetSessionDescriptionAsyncOperation operation)
-    {
-        this.operation = operation;
-        Task.Run(() => CheckCompletion());
-    }
-
-    private async Task CheckCompletion()
-    {
-        while (!operation.IsDone)
-        {
-            await Task.Delay(10);
-        }
-
-        IsDone = true;
-        tcs.SetResult(true);
-    }
-
-    public Task WaitForCompletionAsync()
-    {
-        return tcs.Task;
-    }
-}
-
-public class RTCSessionDescriptionAsyncOperationWrapper
-{
-    private readonly RTCSessionDescriptionAsyncOperation operation;
-    private readonly TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-
-    public bool IsDone { get; private set; }
-
-    public RTCSessionDescriptionAsyncOperationWrapper(RTCSessionDescriptionAsyncOperation operation)
-    {
-        this.operation = operation;
-        Task.Run(() => CheckCompletion());
-    }
-
-    private async Task CheckCompletion()
-    {
-        while (!operation.IsDone)
-        {
-            await Task.Delay(10);
-        }
-
-        IsDone = true;
-        tcs.SetResult(true);
-    }
-
-    public Task WaitForCompletionAsync()
-    {
-        return tcs.Task;
-    }
 }
