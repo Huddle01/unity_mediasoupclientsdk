@@ -221,7 +221,12 @@ public class TestMediasoupLocally : MonoBehaviour
     public async void ConnectSendTransportAndProduce()
     {
 
-        ProducerObj = await SendTransport.ProduceAsync(GetProducerId, ProducerOptionsObj);
+        await SendTransport.ProduceAsync(GetProducerId, HandlProducer, ProducerOptionsObj);
+    }
+
+    private void HandlProducer(Producer<AppData> producer) 
+    {
+        ProducerObj = producer;
 
         ProducerObj.On("trackended", async (args) =>
         {
@@ -232,7 +237,6 @@ public class TestMediasoupLocally : MonoBehaviour
         {
             Debug.Log("Transport ended");
         });
-
     }
 
     private async Task<string> GetProducerId(TrackKind kind, RtpParameters rtp, AppData _appdata)

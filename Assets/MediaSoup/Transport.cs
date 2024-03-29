@@ -14,6 +14,7 @@ using Mediasoup.Types;
 using Newtonsoft.Json.Converters;
 using UnityEngine;
 using System.Runtime.Serialization;
+using Huddle01.Utils;
 
 /// <summary>
 /// 
@@ -54,17 +55,17 @@ namespace Mediasoup.Transports
         Task RestartIceAsync(IceParameters iceParameters);
         Task UpdateIceServers(List<RTCIceServer> iceServers);
 
-        Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
-        ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new();
+        Task ProduceAsync(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
+                                    Action<Producer<AppData>> producerCallback, ProducerOptions<AppData> options = null);
 
         void ConsumeAsync<ConsumerAppData>(
         ConsumerOptions options = null, Action<Consumer<AppData>> resultCallback = null) where ConsumerAppData : AppData, new();
 
-        Task<DataProducer<AppData>> ProduceDataAsync<DataProducerAppData>(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback,
-        DataProducerOptions options = null) where DataProducerAppData : AppData, new();
+        Task ProduceDataAsync(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback, 
+                    Action<DataProducer<AppData>> dataProducerCallback,DataProducerOptions options = null);
 
-        Task<DataConsumer<AppData>> ConsumeDataAsync<DataConsumerAppData>(
-        DataConsumerOptions options = null) where DataConsumerAppData : AppData, new();
+        Task ConsumeDataAsync(Action<DataConsumer<AppData>> dataConsumerCallback,
+        DataConsumerOptions options = null);
 
 
         Task PausePendingConsumers();
@@ -217,7 +218,13 @@ namespace Mediasoup.Transports
         {
             return null;
         }
-        public Task RestartIceAsync(IceParameters iceParameters)
+
+        /// <summary>
+        /// Restart Ice Server, Add the process in queue
+        /// </summary>
+        /// <param name="iceParameters"></param>
+        /// <returns></returns>
+        public async Task RestartIceAsync(IceParameters iceParameters)
         {
             if (isClosed)
             {
@@ -228,14 +235,21 @@ namespace Mediasoup.Transports
                 throw new ArgumentNullException("missing iceParameters");
             }
 
-            return awaitQueue.Push(async () =>
-            {
-                //await handlerInterface.RestartIce(iceParameters);
-                return new object();
-
-            }, "transport.RestartIceAsync");
+            await awaitQueue.Push<bool>(AddRestartIceServersInQueue,null,iceParameters);
         }
 
+        private async Task<bool> AddRestartIceServersInQueue(params object[] args)
+        {
+            IceParameters iceParams = args[0] as IceParameters;
+            await handlerInterface.RestartIce(iceParams);
+            return true;
+        }
+
+        /// <summary>
+        /// Update Ice Server, Add the process in queue
+        /// </summary>
+        /// <param name="iceServers"></param>
+        /// <returns></returns>
         public async Task UpdateIceServers(List<RTCIceServer> iceServers)
         {
             if (isClosed)
@@ -247,17 +261,27 @@ namespace Mediasoup.Transports
                 throw new ArgumentNullException("missing iceParameters");
             }
 
-            _ = awaitQueue.Push<bool>(async () =>
-            {
-                //await handlerInterface.UpdateIceServers(iceServers);
-                return true;
-
-            }, "transport.UpdateIceServers");
+            await awaitQueue.Push<bool>(AddUpdateIceServersInQueue,null,iceServers);
 
         }
 
-        public async Task<Producer<ProducerAppData>> ProduceAsync<ProducerAppData>(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
-                                    ProducerOptions<ProducerAppData> options = null) where ProducerAppData : AppData, new()
+        private async Task<bool> AddUpdateIceServersInQueue(params object[] args) 
+        {
+            List<RTCIceServer> iceServers = args[0] as List<RTCIceServer>;
+            await handlerInterface.UpdateIceServers(iceServers);
+            return true;
+        }
+
+
+        /// <summary>
+        /// This function will add the Consumer creation process in a queue and return the result in callback
+        /// </summary>
+        /// <param name="GetProducerIdCallback">Process of getting DataProducer id from server</param>
+        /// <param name="producerCallback">callback with result</param>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        public async Task ProduceAsync(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
+                                    Action<Producer<AppData>> producerCallback,ProducerOptions<AppData> options = null)
         {
             if (isClosed)
             {
@@ -340,9 +364,20 @@ namespace Mediasoup.Transports
                 encodings = normalizedEncodings
             };
 
+            await awaitQueue.Push<Producer<AppData>>(AddProducerAsyncInQueue, producerCallback, GetProducerIdCallback,
+                                                        options, handlerSendOptions);
+
+        }
+
+        private async Task<Producer<AppData>> AddProducerAsyncInQueue(params object[] args) 
+        {
+            Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback = args[0] as Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>>;
+            ProducerOptions<AppData> options = args[1] as ProducerOptions<AppData>;
+            HandlerSendOptions handlerSendOptions = args[2] as HandlerSendOptions;
+
             HandlerSendResult handlerSendResult = await handlerInterface.Send(handlerSendOptions);
 
-            Producer<ProducerAppData> tempproducer = null;
+            Producer<AppData> tempproducer = null;
 
             Debug.Log("Handler Send Result RTP: " + JsonConvert.SerializeObject(handlerSendResult.rtpParameters));
 
@@ -352,7 +387,7 @@ namespace Mediasoup.Transports
             //Adding a func param so that a method can be injected which can provide producer id
             string num = await GetProducerIdCallback.Invoke(options.track.Kind, handlerSendResult.rtpParameters, appData);
 
-            tempproducer = new Producer<ProducerAppData>(num.ToString(), handlerSendResult.localId,
+            tempproducer = new Producer<AppData>(num.ToString(), handlerSendResult.localId,
                 handlerSendResult.rtpSender, options.track, handlerSendResult.rtpParameters, options.stopTracks,
                 options.disableTrackOnPause, options.zeroRtpOnPause, options.appData);
 
@@ -365,6 +400,13 @@ namespace Mediasoup.Transports
             return tempproducer;
         }
 
+
+        /// <summary>
+        /// This function will add the Consumer creation process in a queue and return the result in callback
+        /// </summary>
+        /// <typeparam name="ConsumerAppData"></typeparam>
+        /// <param name="options"></param>
+        /// <param name="resultCallback"></param>
         public async void ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null,Action<Consumer<AppData>> resultCallback = null)
                 where ConsumerAppData : AppData, new()
         {
@@ -423,12 +465,16 @@ namespace Mediasoup.Transports
 
         }
 
-        public async Task<DataProducer<AppData>> ProduceDataAsync<DataProducerAppData>(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback,
-                                                        DataProducerOptions options = null) where DataProducerAppData : AppData, new()
+        /// <summary>
+        /// This function will add the process of creating DataProducer in queue and return the result in a callback
+        /// </summary>
+        /// <param name="GetProducerIdCallback">Process of getting DataProducer id from server</param>
+        /// <param name="dataProducerCallback">callback with the result</param>
+        /// <param name="options">DataProducerOptions</param>
+        /// <returns></returns>
+        public async Task ProduceDataAsync(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback,
+                               Action<DataProducer<AppData>> dataProducerCallback,DataProducerOptions options = null)
         {
-
-            DataProducer<AppData> dataProducer = null;
-
             if (isClosed)
             {
                 throw new InvalidOperationException("Closed");
@@ -460,44 +506,52 @@ namespace Mediasoup.Transports
                 options.ordered = false;
             }
 
-            await awaitQueue.Push(async () =>
-           {
-
-               HandlerSendDataChannelOptions sendDataOption = new HandlerSendDataChannelOptions
-               {
-                   ordered = options.ordered,
-                   maxPacketLifeTime = options.maxPacketLifeTime,
-                   maxRetransmits = options.maxRetransmits,
-                   label = options.label,
-                   protocol = options.protocol
-               };
-
-               HandlerSendDataChannelResult sendDataResult = await handlerInterface.SendDataChannel(sendDataOption);
-
-               ORTC.ValidateSctpStreamParameters(sendDataResult.sctpStreamParameters);
-
-               //Adding a func param so that a method can be injected which can provide producer id
-               int num = await GetProducerIdCallback.Invoke(sendDataResult.sctpStreamParameters, options.label, options.protocol,
-                                                           options.dataConsumerAppData);
-
-               dataProducer = new DataProducer<AppData>(num.ToString(), sendDataResult.dataChannel,
-                                                       sendDataResult.sctpStreamParameters, options.dataConsumerAppData);
-
-               datapPorducers.Add(dataProducer.id, dataProducer);
-               HandleDataProducer(dataProducer);
-               _ = observer.SafeEmit("newdataproducer", datapPorducers);
-               return dataProducer;
-
-           }, "transport.produceData()");
-
-            return dataProducer;
+            await awaitQueue.Push<DataProducer<AppData>>(AddDataProducerAsyncInQueue, dataProducerCallback, GetProducerIdCallback,options);
         }
 
-        public async Task<DataConsumer<AppData>> ConsumeDataAsync<DataConsumerAppData>(DataConsumerOptions options = null) where DataConsumerAppData : AppData, new()
+
+        private async Task<DataProducer<AppData>> AddDataProducerAsyncInQueue(params object[] args)
+        {
+            Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback = args[0] as Func<SctpStreamParameters, string, string, AppData, Task<int>>;
+            DataProducerOptions options = args[1] as DataProducerOptions;
+            HandlerSendDataChannelOptions sendDataOption = new HandlerSendDataChannelOptions
+            {
+                ordered = options.ordered,
+                maxPacketLifeTime = options.maxPacketLifeTime,
+                maxRetransmits = options.maxRetransmits,
+                label = options.label,
+                protocol = options.protocol
+            };
+
+            HandlerSendDataChannelResult sendDataResult = await handlerInterface.SendDataChannel(sendDataOption);
+
+            ORTC.ValidateSctpStreamParameters(sendDataResult.sctpStreamParameters);
+
+            //Adding a func param so that a method can be injected which can provide producer id
+            int num = await GetProducerIdCallback.Invoke(sendDataResult.sctpStreamParameters, options.label, options.protocol,
+                                                        options.dataConsumerAppData);
+
+            DataProducer<AppData> dataProducer = new DataProducer<AppData>(num.ToString(), sendDataResult.dataChannel,
+                                                    sendDataResult.sctpStreamParameters, options.dataConsumerAppData);
+
+            datapPorducers.Add(dataProducer.id, dataProducer);
+            HandleDataProducer(dataProducer);
+            _ = observer.SafeEmit("newdataproducer", datapPorducers);
+            return dataProducer;
+
+        }
+
+        /// <summary>
+        /// This function will create DataConsumer and will invoke a callback with result DataConsumer
+        /// Process will be added in a queue
+        /// </summary>
+        /// <param name="dataConsumerCallback">Handle dataconsumer</param>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        public async Task ConsumeDataAsync(Action<DataConsumer<AppData>> dataConsumerCallback,
+            DataConsumerOptions options = null)
         {
             SctpStreamParameters sctpStreamParams = Utils.Clone<SctpStreamParameters>(options.sctpStreamParameters);
-
-            DataConsumer<AppData> dataConsumer = null;
 
             if (isClosed)
             {
@@ -530,28 +584,34 @@ namespace Mediasoup.Transports
 
             ORTC.ValidateSctpStreamParameters(options.sctpStreamParameters);
 
-            await awaitQueue.Push(async () =>
+            await awaitQueue.Push<DataConsumer<AppData>>(AddDataConsumerAsyncInQueue, dataConsumerCallback, options);
+        }
+
+        /// <summary>
+        /// DataConsumer creation process
+        /// </summary>
+        /// <param name="args">args[0] as DataConsumerOptions </param>
+        /// <returns></returns>
+        private async Task<DataConsumer<AppData>> AddDataConsumerAsyncInQueue(params object[] args)
+        {
+            DataConsumerOptions options = args[0] as DataConsumerOptions;
+
+            HandlerReceiveDataChannelOptions sendDataoption = new HandlerReceiveDataChannelOptions
             {
-                HandlerReceiveDataChannelOptions sendDataoption = new HandlerReceiveDataChannelOptions
-                {
-                    label = options.label,
-                    protocol = options.protocol,
-                    sctpStreamParameters = options.sctpStreamParameters
-                };
+                label = options.label,
+                protocol = options.protocol,
+                sctpStreamParameters = options.sctpStreamParameters
+            };
 
-                RTCDataChannel sendDataResult = await handlerInterface.ReceiveDataChannel(sendDataoption);
+            RTCDataChannel sendDataResult = await handlerInterface.ReceiveDataChannel(sendDataoption);
 
 
-                dataConsumer = new DataConsumer<AppData>(options.id, options.datProducerId,
-                                                        sendDataResult, options.sctpStreamParameters, options.dataConsumerAppData);
+            DataConsumer<AppData>  dataConsumer = new DataConsumer<AppData>(options.id, options.datProducerId,
+                                                    sendDataResult, options.sctpStreamParameters, options.dataConsumerAppData);
 
-                dataConsumers.Add(dataConsumer.id, dataConsumer);
-                HandleDataConsumer(dataConsumer);
-                _ = observer.SafeEmit("newdataconsumer", dataConsumer);
-                return dataConsumers;
-
-            }, "transport.produceData()");
-
+            dataConsumers.Add(dataConsumer.id, dataConsumer);
+            HandleDataConsumer(dataConsumer);
+            _ = observer.SafeEmit("newdataconsumer", dataConsumer);
             return dataConsumer;
         }
 
@@ -665,32 +725,31 @@ namespace Mediasoup.Transports
         {
             consumerPauseInProgress = true;
 
+            await awaitQueue.Push<bool>(AddPausePendingConsumersToQueue,null);
+
+        }
+
+        private async Task<bool> AddPausePendingConsumersToQueue(params object[] args) 
+        {
+            if (pendingPauseConsumers.Count == 0)
+            {
+                Console.WriteLine("pausePendingConsumers() | there is no Consumer to be paused");
+                return false;
+            }
+
+            var pendingPauseConsumersList = pendingPauseConsumers.Values.ToList();
+
+            pendingPauseConsumers.Clear();
+
             try
             {
-                await awaitQueue.Push(async () =>
-                {
-                    if (pendingPauseConsumers.Count == 0)
-                    {
-                        Console.WriteLine("pausePendingConsumers() | there is no Consumer to be paused");
-                        return new object();
-                    }
-
-                    var pendingPauseConsumersList = pendingPauseConsumers.Values.ToList();
-
-                    pendingPauseConsumers.Clear();
-
-                    try
-                    {
-                        List<string> localIds = pendingPauseConsumersList.Select(x => x.localId).ToList();
-                        await handlerInterface.ResumeReceiving(localIds);
-                        return new object();
-                    }
-                    catch (Exception error)
-                    {
-                        throw new Exception(error.Message);
-                    }
-                }, "transport.resumePendingConsumers");
-
+                List<string> localIds = pendingPauseConsumersList.Select(x => x.localId).ToList();
+                await handlerInterface.ResumeReceiving(localIds);
+                return true;
+            }
+            catch (Exception error)
+            {
+                throw new Exception(error.Message);
             }
             finally
             {
@@ -707,32 +766,33 @@ namespace Mediasoup.Transports
         {
             consumerResumeInProgress = true;
 
-            try
+            await awaitQueue.Push<bool>(AddResumePendingConsumersToQueue,null);
+        }
+
+        private async Task<bool> AddResumePendingConsumersToQueue(params object[] args) 
+        {
+            try 
             {
-                await awaitQueue.Push(async () =>
+                if (pendingResumeConsumers.Count == 0)
                 {
-                    if (pendingResumeConsumers.Count == 0)
-                    {
-                        Console.WriteLine("resumePendingConsumers() | there is no Consumer to be resumed");
-                        return new object();
-                    }
+                    Console.WriteLine("resumePendingConsumers() | there is no Consumer to be resumed");
+                    return false;
+                }
 
-                    var pendingCloseConsumersList = pendingResumeConsumers.Values.ToList();
+                var pendingCloseConsumersList = pendingResumeConsumers.Values.ToList();
 
-                    pendingResumeConsumers.Clear();
+                pendingResumeConsumers.Clear();
 
-                    try
-                    {
-                        List<string> localIds = pendingCloseConsumersList.Select(x => x.localId).ToList();
-                        await handlerInterface.ResumeReceiving(localIds);
-                        return new object();
-                    }
-                    catch (Exception error)
-                    {
-                        throw new Exception(error.Message);
-                    }
-                }, "transport.resumePendingConsumers");
-
+                try
+                {
+                    List<string> localIds = pendingCloseConsumersList.Select(x => x.localId).ToList();
+                    await handlerInterface.ResumeReceiving(localIds);
+                    return true;
+                }
+                catch (Exception error)
+                {
+                    throw new Exception(error.Message);
+                }
             }
             finally
             {
@@ -749,32 +809,33 @@ namespace Mediasoup.Transports
         {
             consumerCloseInProgress = true;
 
-            try
+            await awaitQueue.Push<bool>(AddClosePendingConsumersToQueue, null);
+        }
+
+        private async Task<bool> AddClosePendingConsumersToQueue(params object[] args) 
+        {
+            try 
             {
-                await awaitQueue.Push(async () =>
+                if (pendingCloseConsumers.Count == 0)
                 {
-                    if (pendingCloseConsumers.Count == 0)
-                    {
-                        Console.WriteLine("closePendingConsumers() | There is no Consumer to be closed");
-                        return new object();
-                    }
+                    Console.WriteLine("closePendingConsumers() | There is no Consumer to be closed");
+                    return false;
+                }
 
-                    var pendingCloseConsumersList = pendingCloseConsumers.Values.ToList();
+                var pendingCloseConsumersList = pendingCloseConsumers.Values.ToList();
 
-                    pendingCloseConsumers.Clear();
+                pendingCloseConsumers.Clear();
 
-                    try
-                    {
-                        List<string> localIds = pendingCloseConsumersList.Select(x => x.localId).ToList();
-                        await handlerInterface.StopReceiving(localIds);
-                        return new object();
-                    }
-                    catch (Exception error)
-                    {
-                        throw new Exception(error.Message);
-                    }
-                }, "transport.closePendingConsumers");
-
+                try
+                {
+                    List<string> localIds = pendingCloseConsumersList.Select(x => x.localId).ToList();
+                    await handlerInterface.StopReceiving(localIds);
+                    return true;
+                }
+                catch (Exception error)
+                {
+                    throw new Exception(error.Message);
+                }
             }
             finally
             {
@@ -785,7 +846,6 @@ namespace Mediasoup.Transports
                     await ClosePendingConsumers();
                 }
             }
-
         }
 
         private void HandleHandler()
