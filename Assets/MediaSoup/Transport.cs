@@ -177,7 +177,7 @@ namespace Mediasoup.Transports
             isClosed = true;
 
             // Stop the AwaitQueue.
-            //this._awaitQueue.stop();
+            this.awaitQueue.Stop();
 
             // Close the handler.
             this.handlerInterface.Close();
@@ -460,7 +460,7 @@ namespace Mediasoup.Transports
 
             if (!consumerCreationInProgress)
             {
-                Task.Run(()=>CreatePendingConsumer<ConsumerAppData>(resultCallback));
+                Task.Run(()=>CreatePendingConsumer(resultCallback));
             }
 
         }
@@ -615,19 +615,12 @@ namespace Mediasoup.Transports
             return dataConsumer;
         }
 
-        public async Task CreatePendingConsumer<ConsumerAppData>(Action<Consumer<AppData>> resultCallback) where ConsumerAppData : AppData
+        public async Task CreatePendingConsumer(Action<Consumer<AppData>> resultCallback)
         {
             Debug.Log("CreatePendingConsumer() | Starting creating pending consumer");
             consumerCreationInProgress = true;
 
-            await awaitQueue.Push<bool>(AddCreatePendingConsumerToQueue, null, resultCallback).ContinueWith((prevTask)=> 
-            {
-                consumerCreationInProgress = false;
-                if (pendingConsumerTasks.Count>0) 
-                {
-                    CreatePendingConsumer<ConsumerAppData>(resultCallback);
-                }
-            });
+            await awaitQueue.Push<bool>(AddCreatePendingConsumerToQueue, null, resultCallback);
         }
 
         private async Task<bool> AddCreatePendingConsumerToQueue(params object[] args) 
@@ -726,12 +719,17 @@ namespace Mediasoup.Transports
                     });
 
                     _probatorConsumerCreated = true;
-
                 }
                 catch (Exception ex)
                 {
                     throw new Exception("createPendingConsumers() | failed to create Consumer for RTP probation");
                 }
+            }
+
+            consumerCreationInProgress = false;
+            if (pendingConsumerTasks.Count > 0)
+            {
+                CreatePendingConsumer(resultCallback);
             }
 
             return true;
@@ -930,12 +928,137 @@ namespace Mediasoup.Transports
 
         }
 
-        private void HandleProducer<TAppData>(Producer<TAppData> _producer) where TAppData : AppData
+        private void HandleProducer(Producer<AppData> _producer)
         {
             _producer.On("@close", async _ =>
             {
                 producers.Remove(_producer.id);
+
+                if (isClosed) return;
+
+                await awaitQueue.Push<bool>(AddSetSendingToQueue, null, _producer);
             });
+
+            _producer.On("@pause", async (args) =>
+            {
+                if (isClosed) return;
+                Action callback = args[0] as Action;
+                Action errorCallback = args[1] as Action;
+                await awaitQueue.Push<bool>(AddPauseSendingToQueue, null, _producer, callback, errorCallback);
+            });
+
+            _producer.On("@resume", async (args) =>
+            {
+                if (isClosed) return;
+                Action callback = args[0] as Action;
+                Action errorCallback = args[1] as Action;
+                await awaitQueue.Push<bool>(AddResumeSendingToQueue, null, _producer, callback, errorCallback);
+            });
+
+            _producer.On("@replacetrack", async (args) =>
+            {
+                if (isClosed) return;
+                MediaStreamTrack track = args[0] as MediaStreamTrack;
+                Action callback = args[1] as Action;
+                Action errorCallback = args[2] as Action;
+                await awaitQueue.Push<bool>(AddReplaceTrackSendingToQueue, null, _producer, track, callback, errorCallback);
+            });
+
+            _producer.On("@setmaxspatiallayer", async (args) =>
+            {
+                if (isClosed) return;
+                int spatialLayer = (int)args[0];
+                Action callback = args[1] as Action;
+                Action errorCallback = args[2] as Action;
+                await awaitQueue.Push<bool>(AddSetSpatialLayerTrackSendingToQueue, null, _producer, spatialLayer, callback, errorCallback);
+            });
+
+            _producer.On("@setrtpencodingparameters", async (args) =>
+            {
+                if (isClosed) return;
+                RtpEncodingParameters param = args[0] as RtpEncodingParameters;
+                Action callback = args[1] as Action;
+                Action errorCallback = args[2] as Action;
+                await awaitQueue.Push<bool>(AddSetRtpEncodingParamTrackSendingToQueue, null, _producer, param, callback, errorCallback);
+            });
+
+            _producer.On("@getstats", async (args) =>
+             {
+                 Action callbackAction = args[0] as Action;
+
+                 if (isClosed)
+                 {
+                     return;
+                 }
+
+                 await handlerInterface.GetSenderStats(_producer.localId).
+                 ContinueWith((prevTask) => callbackAction.Invoke());
+             });
+        }
+
+        private async Task<bool> AddSetSendingToQueue(params object[] args) 
+        {
+            Producer<AppData> producer = args[0] as Producer<AppData>;
+            handlerInterface.StopSending(producer.id);
+            return true;
+        }
+
+        private async Task<bool> AddPauseSendingToQueue(params object[] args)
+        {
+            Producer<AppData> producer = args[0] as Producer<AppData>;
+            Action callback = args[1] as Action;
+            Action errorCallback = args[2] as Action;
+            handlerInterface.PauseSending(producer.id);
+            callback.Invoke();
+
+            return true;
+        }
+
+        private async Task<bool> AddResumeSendingToQueue(params object[] args)
+        {
+            Producer<AppData> producer = args[0] as Producer<AppData>;
+            Action callback = args[1] as Action;
+            Action errorCallback = args[2] as Action;
+            handlerInterface.ResumeSending(producer.id);
+            callback.Invoke();
+
+            return true;
+        }
+
+        private async Task<bool> AddReplaceTrackSendingToQueue(params object[] args)
+        {
+            Producer<AppData> producer = args[0] as Producer<AppData>;
+            MediaStreamTrack track = args[1] as MediaStreamTrack;
+            Action callback = args[2] as Action;
+            Action errorCallback = args[3] as Action;
+            handlerInterface.ReplaceTrack(producer.localId, track);
+            callback.Invoke();
+
+            return true;
+        }
+
+        private async Task<bool> AddSetSpatialLayerTrackSendingToQueue(params object[] args)
+        {
+            Producer<AppData> producer = args[0] as Producer<AppData>;
+            int spatialLayer = (int)args[1];
+            Action callback = args[2] as Action;
+            Action errorCallback = args[3] as Action;
+            handlerInterface.SetMaxSpatialLayer(producer.localId, spatialLayer);
+            callback.Invoke();
+
+            return true;
+        }
+
+        private async Task<bool> AddSetRtpEncodingParamTrackSendingToQueue(params object[] args)
+        {
+            Producer<AppData> producer = args[0] as Producer<AppData>;
+            RtpEncodingParameters param = args[1] as RtpEncodingParameters;
+            Action callback = args[2] as Action;
+            Action errorCallback = args[3] as Action;
+            handlerInterface.SetRtpEncodingParameters(producer.localId, param);
+            callback.Invoke();
+
+            return true;
         }
 
         private void HandleConsumer(Consumer<AppData> _consumer)
@@ -943,7 +1066,82 @@ namespace Mediasoup.Transports
             _consumer.On("@close", async _ =>
             {
                 consumers.Remove(_consumer.id);
+                pendingPauseConsumers.Remove(_consumer.id);
+                pendingResumeConsumers.Remove(_consumer.id);
+                if (isClosed) 
+                {
+                    return;
+                }
+
+                pendingCloseConsumers.Add(_consumer.id,_consumer);
+
+                if (!consumerCloseInProgress) 
+                {
+                    ClosePendingConsumers();
+                }
+
             });
+
+            _consumer.On("@pause", async _ =>
+            {
+                if (pendingResumeConsumers.TryGetValue(_consumer.id, out IConsumer tempcon)) 
+                {
+                    pendingResumeConsumers.Remove(_consumer.id);
+                }
+
+                pendingPauseConsumers.Add(_consumer.id,_consumer);
+
+                await Task.Run(() =>
+                {
+                    if (isClosed)
+                    {
+                        return;
+                    }
+
+                    if (!consumerPauseInProgress)
+                    {
+                        PausePendingConsumers();
+                    }
+                });
+            });
+
+
+            _consumer.On("@resume", async _ =>
+            {
+                if (pendingPauseConsumers.TryGetValue(_consumer.id, out IConsumer tempcon))
+                {
+                    pendingPauseConsumers.Remove(_consumer.id);
+                }
+
+                pendingResumeConsumers.Add(_consumer.id, _consumer);
+
+                await Task.Run(() =>
+                {
+                    if (isClosed)
+                    {
+                        return;
+                    }
+
+                    if (!consumerPauseInProgress)
+                    {
+                        ResumePendingConsumers();
+                    }
+                });
+            });
+
+            _consumer.On("@getstats", async (arg) =>
+            {
+                Action callbackAction = arg[0] as Action;
+
+                if (isClosed)
+                {
+                    return;
+                }
+
+                await handlerInterface.GetReceiverStats(_consumer.localId).
+                ContinueWith((prevTask) => callbackAction.Invoke());
+            });
+
         }
 
         private void HandleDataProducer(DataProducer<AppData> _dataProducer)
