@@ -1,0 +1,17 @@
+{
+    "name": "Mediasoup",
+    "rootNamespace": "",
+    "references": [
+        "GUID:f12aafacab75a87499e7e45c873ffab8",
+        "GUID:383625a01329fa946865af8cbb685be7"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
