@@ -4,6 +4,10 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using System.Reflection;
+using Mediasoup;
+using Mediasoup.Types;
+using Mediasoup.DataProducers;
+using Mediasoup.DataConsumers;
 
 namespace Huddle01.Utils 
 {
@@ -75,8 +79,21 @@ namespace Huddle01.Utils
                 {
                     PendingTaskClass<float> nextTaskToExe = nextTask as PendingTaskClass<float>;
                     Execute<float>(nextTaskToExe);
+                } else if (genericArgumentType == typeof(Producer<AppData>))
+                {
+                    PendingTaskClass<Producer<AppData>> nextTaskToExe = nextTask as PendingTaskClass<Producer<AppData>>;
+                    Execute<Producer<AppData>>(nextTaskToExe);
                 }
-
+                else if (genericArgumentType == typeof(DataProducer<AppData>))
+                {
+                    PendingTaskClass<DataProducer<AppData>> nextTaskToExe = nextTask as PendingTaskClass<DataProducer<AppData>>;
+                    Execute<DataProducer<AppData>>(nextTaskToExe);
+                }
+                else if (genericArgumentType == typeof(DataConsumer<AppData>))
+                {
+                    PendingTaskClass<DataConsumer<AppData>> nextTaskToExe = nextTask as PendingTaskClass<DataConsumer<AppData>>;
+                    Execute<DataConsumer<AppData>>(nextTaskToExe);
+                }
             }
             else
             {
