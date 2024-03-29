@@ -8,6 +8,7 @@ using Mediasoup;
 using Mediasoup.Types;
 using Mediasoup.DataProducers;
 using Mediasoup.DataConsumers;
+using System.Linq;
 
 namespace Huddle01.Utils 
 {
@@ -18,9 +19,16 @@ namespace Huddle01.Utils
         private int _taskNumber = 0;
         private int _currentExecutingTask = 0;
 
+        private bool _stopping = false;
+
         public AwaitQueue()
         {
 
+        }
+
+        public int GetSize() 
+        {
+            return _pendingTasks.Count;
         }
 
         public async Task Push<T>(Func<object[], Task<T>> body, Action<T> callback, params object[] args)
@@ -101,6 +109,30 @@ namespace Huddle01.Utils
                 return;
             }
         }
+
+        public void Stop() 
+        {
+            _stopping = true;
+
+            foreach (var item in _pendingTasks)
+            {
+                _pendingTasks.Remove(item.Key);
+            }
+
+            _stopping = false;
+        }
+
+        public void Remove(int id) 
+        {
+            object taskToRemove = null;
+
+            if (_pendingTasks.TryGetValue(id,out taskToRemove)) 
+            {
+                _pendingTasks.Remove(id);
+            }
+        }
+
+
     }
 
     public class PendingTaskClass<T>

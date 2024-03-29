@@ -180,7 +180,7 @@ namespace Mediasoup.Transports
             //this._awaitQueue.stop();
 
             // Close the handler.
-            //this._handler.close();
+            this.handlerInterface.Close();
 
             connectionState = RTCIceConnectionState.Closed;
 
@@ -618,7 +618,21 @@ namespace Mediasoup.Transports
         public async Task CreatePendingConsumer<ConsumerAppData>(Action<Consumer<AppData>> resultCallback) where ConsumerAppData : AppData
         {
             Debug.Log("CreatePendingConsumer() | Starting creating pending consumer");
-            
+            consumerCreationInProgress = true;
+
+            await awaitQueue.Push<bool>(AddCreatePendingConsumerToQueue, null, resultCallback).ContinueWith((prevTask)=> 
+            {
+                consumerCreationInProgress = false;
+                if (pendingConsumerTasks.Count>0) 
+                {
+                    CreatePendingConsumer<ConsumerAppData>(resultCallback);
+                }
+            });
+        }
+
+        private async Task<bool> AddCreatePendingConsumerToQueue(params object[] args) 
+        {
+            Action<Consumer<AppData>> resultCallback = args[0] as Action<Consumer<AppData>>;
             if (pendingConsumerTasks.Count == 0)
             {
                 Debug.LogError("createPendingConsumers() | there is no Consumer to be created");
@@ -719,6 +733,9 @@ namespace Mediasoup.Transports
                     throw new Exception("createPendingConsumers() | failed to create Consumer for RTP probation");
                 }
             }
+
+            return true;
+
         }
 
         public async Task PausePendingConsumers()
