@@ -21,11 +21,11 @@ public class TestMediasoupLocally : MonoBehaviour
     public Device DeviceObj;
     public RtpCapabilities RtpCapabilitiesObj;
 
-    public Transport<AppData> SendTransport;
-    public Transport<AppData> ReceiveTransport;
+    public Transport<Mediasoup.Types.AppData> SendTransport;
+    public Transport<Mediasoup.Types.AppData> ReceiveTransport;
 
-    public Producer<AppData> ProducerObj;
-    public Consumer<AppData> ConsumerObj;
+    public Producer<Mediasoup.Types.AppData> ProducerObj;
+    public Consumer<Mediasoup.Types.AppData> ConsumerObj;
 
     private WebCamTexture _webCamTexture;
     private Texture _webCamStreamingTexture;
@@ -44,12 +44,12 @@ public class TestMediasoupLocally : MonoBehaviour
 
     private string _producerId;
 
-    public ProducerOptions<AppData> ProducerOptionsObj;
+    public ProducerOptions<Mediasoup.Types.AppData> ProducerOptionsObj;
 
     // Start is called before the first frame update
     async void Start()
     {
-        ProducerOptionsObj = new ProducerOptions<AppData>
+        ProducerOptionsObj = new ProducerOptions<Mediasoup.Types.AppData>
         {
             encodings = {   new RtpEncodingParameters
                             {
@@ -166,7 +166,7 @@ public class TestMediasoupLocally : MonoBehaviour
         object proprietaryConstraints = null;
         if (jsonParsed["data"]["proprietaryConstraints"] != null) JsonConvert.DeserializeObject<object>(jsonParsed["data"]["proprietaryConstraints"].ToString());
 
-        AppData appData = new AppData();
+        Mediasoup.Types.AppData appData = new Mediasoup.Types.AppData();
         SendTransport = DeviceObj.CreateSendTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
                                                 iceTransportPolicy, additionalSettings, proprietaryConstraints, appData);
 
@@ -224,7 +224,7 @@ public class TestMediasoupLocally : MonoBehaviour
         await SendTransport.ProduceAsync(GetProducerId, HandlProducer, ProducerOptionsObj);
     }
 
-    private void HandlProducer(Producer<AppData> producer) 
+    private void HandlProducer(Producer<Mediasoup.Types.AppData> producer) 
     {
         ProducerObj = producer;
 
@@ -239,7 +239,7 @@ public class TestMediasoupLocally : MonoBehaviour
         });
     }
 
-    private async Task<string> GetProducerId(TrackKind kind, RtpParameters rtp, AppData _appdata)
+    private async Task<string> GetProducerId(TrackKind kind, RtpParameters rtp, Mediasoup.Types.AppData _appdata)
     {
         RtpParameters rtpParameters = rtp;
 
@@ -305,7 +305,7 @@ public class TestMediasoupLocally : MonoBehaviour
         object proprietaryConstraints = null;
         if (jsonParsed["data"]["proprietaryConstraints"] != null) JsonConvert.DeserializeObject<object>(jsonParsed["data"]["proprietaryConstraints"].ToString());
 
-        AppData appData = new AppData();
+        Mediasoup.Types.AppData appData = new Mediasoup.Types.AppData();
 
         ReceiveTransport = DeviceObj.CreateRecvTransport(id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
                                                 iceTransportPolicy, additionalSettings, proprietaryConstraints, appData);
