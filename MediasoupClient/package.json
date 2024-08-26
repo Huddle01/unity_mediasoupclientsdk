@@ -10,9 +10,10 @@
     "webrtc"
   ],
   "dependencies": {
-    "com.unity.webrtc@3.0.0-pre.7",
-    "com.unity.nuget.newtonsoft-json": "3.2.1",
-    "com.unity.textmeshpro@3.0.6"
+    "com.unity.nuget.newtonsoft-json" : "3.2.1",
+    "com.unity.webrtc":"3.0.0-pre.7",
+    "com.unity.textmeshpro":"3.0.6"
+    
   },
   "samples": [{
       "displayName": "Example",
