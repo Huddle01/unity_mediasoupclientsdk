@@ -1,0 +1,23 @@
+{
+  "name": "com.huddle01.mediasoupClient",
+  "displayName": "Huddle01 MediasoupClient",
+  "version": "1.0.0",
+  "unity": "2022.3.19f",
+  "description": "Mediasoup client written in c# for building applications that run in Unity for platforms like Android, Standalone and Ios",
+  "keywords": [
+    "mediasoup",
+    "mediasoupClient",
+    "webrtc"
+  ],
+  "dependencies": {
+    "com.unity.webrtc@3.0.0-pre.7",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.textmeshpro@3.0.6"
+  },
+  "samples": [{
+      "displayName": "Example",
+      "description": "Mediasou example",
+      "path": "Samples"
+    }
+  ]
+}
