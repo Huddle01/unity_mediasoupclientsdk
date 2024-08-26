@@ -3,7 +3,7 @@
   "name": "com.huddle.mediasoupclient",
   "displayName": "Huddle01 MediasoupClient",
   "version": "1.0.0",
-  "unity": "2022.3.19f",
+  "unity": "2022.3",
   "description": "Mediasoup client written in c# for building applications that run in Unity for platforms like Android, Standalone and Ios",
   "keywords": [
     "mediasoup",
