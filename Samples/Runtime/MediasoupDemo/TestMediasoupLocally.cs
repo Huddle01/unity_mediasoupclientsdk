@@ -388,10 +388,10 @@ public class TestMediasoupLocally : MonoBehaviour
 
         Debug.Log("Create Consumer Obj");
 
-        ReceiveTransport.ConsumeAsync<AppData>(options, HandleConsumer);
+        ReceiveTransport.ConsumeAsync<Mediasoup.Types.AppData>(options, HandleConsumer);
     }
 
-    private void HandleConsumer(Consumer<AppData> consumer)
+    private void HandleConsumer(Consumer<Mediasoup.Types.AppData> consumer)
     {
         Debug.Log("Consumer Creation Done");
         ConsumerObj = consumer;
