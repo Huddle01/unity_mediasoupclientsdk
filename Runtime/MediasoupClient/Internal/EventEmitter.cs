@@ -41,14 +41,14 @@ namespace Mediasoup.Internal
         }
 
         private readonly Dictionary<string, EventHandler> namedHandlers = new();
-        
+
 
         private EventHandler CreateHandlers(string name)
         {
             if (namedHandlers.TryGetValue(name, out var handlers)) return handlers;
-            if (namedHandlers.TryGetValue(name, out handlers)) return handlers;
-            handlers = null;
-            namedHandlers.Add(name, handlers);
+            handlers = async (args) => { await Task.CompletedTask; }; 
+            namedHandlers.Add(name, handlers); 
+
             return handlers;
         }
 

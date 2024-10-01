@@ -83,6 +83,8 @@ namespace Mediasoup
             // This may throw
             ORTC.ValidateSctpCapabilities(sctpCapabilities);
 
+            isLoaded = true;
+
             UnityEngine.Debug.Log("Loaded");
         }
 
