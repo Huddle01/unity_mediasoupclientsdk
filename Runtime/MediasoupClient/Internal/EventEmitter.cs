@@ -41,14 +41,15 @@ namespace Mediasoup.Internal
         }
 
         private readonly Dictionary<string, EventHandler> namedHandlers = new();
+        private readonly Dictionary<string, EventHandler> onceHandler = new();
 
 
         private EventHandler CreateHandlers(string name)
         {
             if (namedHandlers.TryGetValue(name, out var handlers)) return handlers;
-            handlers = async (args) => { await Task.CompletedTask; }; 
-            namedHandlers.Add(name, handlers); 
-
+            if (namedHandlers.TryGetValue(name, out handlers)) return handlers;
+            handlers = null;
+            namedHandlers.Add(name, handlers);
             return handlers;
         }
 
@@ -71,16 +72,27 @@ namespace Mediasoup.Internal
             return new EventListener(() => tuple.Item1 -= handler);
         }*/
 
-        public void Once(string name, EventHandler handler)
+        /* public void Once(string name, EventHandler handler)
+         {
+             EventHandler tuple = CreateHandlers(name);
+             EventHandler? h = null;
+             h = async args =>
+             {
+                 await handler(args);
+                 tuple -= h;
+             };
+             tuple += h;
+         }*/
+
+        public void Once(string eventName, EventHandler handler)
         {
-            EventHandler tuple = CreateHandlers(name);
-            EventHandler? h = null;
-            h = async args =>
+            Debug.Log($"Adding to once {eventName}");
+            if (!onceHandler.ContainsKey(eventName))
             {
-                await handler(args);
-                tuple -= h;
-            };
-            tuple += h;
+                Debug.Log($"Adding to once {eventName}");
+                onceHandler[eventName] = handler;
+            }
+
         }
 
         public void AddEventListener(string name, EventHandler handler) => On(name, handler);
@@ -99,16 +111,32 @@ namespace Mediasoup.Internal
             namedHandlers.Remove(name);
         }
 
+        /* public async Task Emit(string name, params object?[]? data)
+         {
+             if (!namedHandlers.TryGetValue(name, out var handlers)) 
+             {
+                 return;
+             }
+
+             //Debug.Log($"{name} Does exist");
+             if (handlers == null) Debug.Log($"handler is null");
+             await handlers.Invoke(data);
+         }*/
+
         public async Task Emit(string name, params object?[]? data)
         {
-            if (!namedHandlers.TryGetValue(name, out var handlers)) 
+            if (namedHandlers.TryGetValue(name, out var handlers))
             {
-                return;
+                if (handlers == null) Debug.Log($"handler is null for {name}");
+                await handlers.Invoke(data);
             }
 
-            //Debug.Log($"{name} Does exist");
-            if (handlers == null) Debug.Log($"handler is null");
-            await handlers.Invoke(data);
+            if (onceHandler.TryGetValue(name, out var onceHandlers))
+            {
+                if (onceHandlers == null) Debug.Log($"handler is null for {name}");
+                await onceHandlers.Invoke(data);
+                onceHandler.Remove(name);
+            }
         }
 
 

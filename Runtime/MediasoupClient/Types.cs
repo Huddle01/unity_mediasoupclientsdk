@@ -12,55 +12,55 @@ namespace Mediasoup.Types
 
     public class AppData : IDictionary
     {
-        public object this[object key] { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        private readonly Dictionary<object, object> _data = new Dictionary<object, object>();
 
-        public bool IsFixedSize => throw new NotImplementedException();
+        public object this[object key]
+        {
+            get => _data[key];
+            set => _data[key] = value;
+        }
 
-        public bool IsReadOnly => throw new NotImplementedException();
-
-        public ICollection Keys => throw new NotImplementedException();
-
-        public ICollection Values => throw new NotImplementedException();
-
-        public int Count => throw new NotImplementedException();
-
-        public bool IsSynchronized => throw new NotImplementedException();
-
-        public object SyncRoot => throw new NotImplementedException();
+        public bool IsFixedSize => false;
+        public bool IsReadOnly => false;
+        public ICollection Keys => _data.Keys;
+        public ICollection Values => _data.Values;
+        public int Count => _data.Count;
+        public bool IsSynchronized => false;
+        public object SyncRoot => new object();
 
         public void Add(object key, object value)
         {
-            throw new NotImplementedException();
+            _data.Add(key, value);
         }
 
         public void Clear()
         {
-            throw new NotImplementedException();
+            _data.Clear();
         }
 
         public bool Contains(object key)
         {
-            throw new NotImplementedException();
+            return _data.ContainsKey(key);
         }
 
         public void CopyTo(Array array, int index)
         {
-            throw new NotImplementedException();
+            ((ICollection)_data).CopyTo(array, index);
         }
 
         public IDictionaryEnumerator GetEnumerator()
         {
-            throw new NotImplementedException();
+            return _data.GetEnumerator();
         }
 
         public void Remove(object key)
         {
-            throw new NotImplementedException();
+            _data.Remove(key);
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            throw new NotImplementedException();
+            return _data.GetEnumerator();
         }
     }
 }
