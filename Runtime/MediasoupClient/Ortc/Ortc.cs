@@ -91,6 +91,7 @@ namespace Mediasoup.Ortc
                 codec.Channels = 1;
             }
 
+            if (codec.Kind == MediaKind.VIDEO) { codec.Channels = 0; }
             // parameters is optional. If unset, set it to an empty object.
             codec.Parameters ??= new Dictionary<string, object>();
 

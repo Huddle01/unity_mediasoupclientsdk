@@ -391,7 +391,7 @@ namespace Mediasoup.Transports
                 handlerSendResult.rtpSender, options.track, handlerSendResult.rtpParameters, options.stopTracks,
                 options.disableTrackOnPause, options.zeroRtpOnPause, options.appData);
 
-            producers.Add(tempproducer.id, tempproducer);
+            producers[tempproducer.id] = tempproducer;
             HandleProducer(tempproducer);
 
             Debug.Log($"Return Producer async");
