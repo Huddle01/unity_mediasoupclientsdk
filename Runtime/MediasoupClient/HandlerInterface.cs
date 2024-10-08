@@ -128,8 +128,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             false
         );
 
-        Debug.Log("Remote SDP Run: " + JsonConvert.SerializeObject(options.extendedRtpCapabilities));
-
         _sendingRtpParametersByKind.Add("audio", ORTC.GetSendingRtpParameters(MediaKind.AUDIO, options.extendedRtpCapabilities));
         _sendingRtpParametersByKind.Add("video", ORTC.GetSendingRtpParameters(MediaKind.VIDEO, options.extendedRtpCapabilities));
 
@@ -141,7 +139,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             _forcedLocalDtlsRole = options.dtlsParameters.role == DtlsRole.server ? DtlsRole.client : DtlsRole.server;
         }
 
-        RTCConfiguration config = new RTCConfiguration { 
+        RTCConfiguration config = new RTCConfiguration
+        {
             bundlePolicy = RTCBundlePolicy.BundlePolicyMaxBundle,
             iceTransportPolicy = RTCIceTransportPolicy.All,
         };
@@ -174,6 +173,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
                 case RTCIceConnectionState.Connected:
                 case RTCIceConnectionState.Completed:
+                    Debug.Log("Handler connected");
                     _ = Emit("@connectionstatechange", "connected");
                     break;
 
@@ -193,7 +193,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         pc.OnIceCandidate += async (RTCIceCandidate c) =>
         {
-            Debug.Log($"ICE CONNECTION: Ice Candidate Added: Canidate: {c.Candidate}, Address: {c.Address}, port: {c.Port}, username: {c.UserNameFragment}");
             if (username == null) username = c.UserNameFragment;
         };
 
@@ -271,7 +270,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         return statsOp.Value;
     }
 
-    public virtual async Task<HandlerSendResult> Send(HandlerSendOptions options)
+    public virtual async Task<HandlerSendResult> Send(HandlerSendOptions options, Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
     {
         if (options.encodings != null && options.encodings.Count > 1)
         {
@@ -308,14 +307,11 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         RtpParameters sendingRtpParameters = Utils.Clone(_sendingRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
         sendingRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRtpParameters.Codecs, options.codec);
-        Debug.Log("Sending RTP Parameters: " + JsonConvert.SerializeObject(sendingRtpParameters));
 
         RtpParameters sendingRemoteRtpParameters = Utils.Clone(_sendingRemoteRtpParametersByKind![options.track.Kind.ToString().ToLower()]);
         sendingRemoteRtpParameters.Codecs = ORTC.ReduceCodecs(sendingRemoteRtpParameters.Codecs, options.codec);
-        Debug.Log("Sending Remote RTP Parameters: " + JsonConvert.SerializeObject(sendingRemoteRtpParameters));
 
         Tuple<int, string> mediaSectionIdx = remoteSdp.GetNextMediaSectionIdx();
-        Debug.Log($"mediaSectionIdx value {mediaSectionIdx.Item2}");
 
         RTCRtpTransceiverInit transceiverInit = new RTCRtpTransceiverInit
         {
@@ -324,31 +320,21 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             direction = RTCRtpTransceiverDirection.SendOnly,
         };
 
-        Debug.Log("Adding Transciever");
 
         RTCRtpTransceiver transceiver = pc.AddTransceiver(options.track, transceiverInit);
-
-        Debug.Log("Generating Offer");
 
         RTCSessionDescriptionAsyncOperation offer = await CreateOfferAsync(pc);
 
         Sdp localSdp = offer.Desc.sdp.ToSdp();
 
-        Debug.Log("Local SDP: " + offer.Desc.sdp.Replace("actpass", "passive"));
-
         if (!_transportReady)
         {
             DtlsRole localRole = _forcedLocalDtlsRole.HasValue ? _forcedLocalDtlsRole.Value : DtlsRole.client;
-            SetupTransport(localRole, localSdp);
+            await SetupTransport(localRole, localSdp, "send", connectTransportCallback);
         }
-
-        Debug.Log($"SetLocalDescriptionAsync");
 
         var localDescSetupOp = await SetLocalDescriptionAsync(pc, offer.Desc);
 
-        Debug.Log($"LocalDescSetupOp complete: {localDescSetupOp.IsDone}");
-
-        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
 
         // We can now get the transceiver.mid.
         string localId = transceiver.Mid;
@@ -356,8 +342,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         sendingRtpParameters.Mid = localId;
 
         localSdp = pc.LocalDescription.sdp.ToSdp();
-
-        Debug.Log($"PC State: {pc.SignalingState.ToString()}");
 
         MediaDescription offerMediaObject = localSdp.MediaDescriptions[mediaSectionIdx.Item1];
 
@@ -389,8 +373,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         remoteSdp.Send(offerMediaObject, mediaSectionIdx.Item2, sendingRtpParameters, sendingRemoteRtpParameters, options.codecOptions, true);
 
-        Debug.Log($"PC State complete: {pc.SignalingState.ToString()}");
-
         string remoteSdpFlat = remoteSdp.GetSdp();
 
         RTCSessionDescription sessionDescription = new RTCSessionDescription
@@ -399,22 +381,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             sdp = remoteSdpFlat
         };
 
-        Debug.Log("Remote SDP: " + remoteSdpFlat);
-
-        Debug.Log($"Session Description: {sessionDescription.sdp}");
-        Debug.Log($"PC State complete: {pc.SignalingState}");
-        //Debug.Log($"Media FMts: {remoteSdp}");
-
         var remoteSdbSetupOp = await SetRemoteDescriptionAsync(pc, sessionDescription);
-
-        Debug.Log($"remoteSdbSetupOp complete: {remoteSdbSetupOp.IsDone}, Error: {remoteSdbSetupOp.Error.message}");
-
-        Debug.Log($"PC State complete: {pc.SignalingState}");
-
-        // Store in the map.
         _mapMidTransceiver.Add(localId, transceiver);
-
-        Debug.Log($"Sending RTP Parameters: {JsonConvert.SerializeObject(sendingRtpParameters)}");
 
         HandlerSendResult result = new HandlerSendResult
         {
@@ -581,7 +549,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         RTCStatsReportAsyncOperation statsOp = await GetTransreceiverStats(transceiver);
         return statsOp.Value;
     }
-    public virtual async Task<HandlerSendDataChannelResult> SendDataChannel(HandlerSendDataChannelOptions options)
+    public virtual async Task<HandlerSendDataChannelResult> SendDataChannel(HandlerSendDataChannelOptions options,
+                                                            Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
     {
         RTCDataChannelInit channelInit = new RTCDataChannelInit
         {
@@ -603,7 +572,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             MediaDescription offerMediaObject = localSdpObject.MediaDescriptions.FirstOrDefault(x => x.Media == MediaType.Application);
             if (!_transportReady)
             {
-                SetupTransport(DtlsRole.client, localSdpObject);
+                _ = await SetupTransport(DtlsRole.client, localSdpObject, "send", connectTransportCallback);
             }
             _ = await SetLocalDescriptionAsync(pc, offer.Desc);
             remoteSdp.SendSctpAssociation(offerMediaObject);
@@ -628,7 +597,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             sctpStreamParameters = sctpStreamParameters
         };
     }
-    public virtual async Task<List<HandlerReceiveResult>> Receive(List<HandlerReceiveOptions> optionsList)
+    public virtual async Task<List<HandlerReceiveResult>> Receive(List<HandlerReceiveOptions> optionsList,
+                                                            Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
     {
         List<HandlerReceiveResult> results = new List<HandlerReceiveResult>();
         Dictionary<string, string> mapLocalId = new Dictionary<string, string>();
@@ -638,7 +608,6 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             string kind = options.kind;
             RtpParameters rtpParameters = options.rtpParameters;
 
-            Debug.Log("Handler | Receive() | Option.RtpParameters: " + JsonConvert.SerializeObject(rtpParameters));
 
             string streamId = options.streamId;
             Debug.Log($"receive() [trackId:{trackId}, kind:{kind}]");
@@ -665,27 +634,11 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             sdp = remoteSdp.GetSdp()
         };
 
-        Debug.Log($"Receive() | Setting Remote Description {remoteSdp.GetSdp()}");
-
-        //Debug.Log($"Receive | SDP Offer: {offer.GetStringValue()}");
-
-
-        Debug.Log("Peer connection state: " + pc.SignalingState.ToString());
-
         RTCSetSessionDescriptionAsyncOperation remoteDescOp = await SetRemoteDescriptionAsync(pc, offer);
-
-        Debug.Log("Remote Description Setup Complete?: " + remoteDescOp.IsDone + " Error: " + remoteDescOp.Error.message);
-
-        Debug.Log("Peer connection state: " + pc.SignalingState.ToString());
-
         RTCSessionDescriptionAsyncOperation answer = await CreateAnswerAsync(pc);
-
-        Debug.Log("Answer generated: " + answer.Desc.type + " Error: " + answer.Error.message);
-        Debug.Log("Peer connection state: " + pc.SignalingState.ToString());
 
         Sdp localSdpObject = answer.Desc.sdp.ToSdp();
 
-        Debug.Log("Answer SDP: " + answer.Desc.sdp);
 
         foreach (HandlerReceiveOptions options in optionsList)
         {
@@ -711,12 +664,10 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         if (!_transportReady)
         {
-            SetupTransport(DtlsRole.client, localSdpObject);
+            _ = await SetupTransport(DtlsRole.client, localSdpObject, "recv", connectTransportCallback);
         }
 
         var setLocalDescOp = await SetLocalDescriptionAsync(pc, answerDes);
-
-        Debug.Log("Local Description Setup Complete?: " + setLocalDescOp.IsDone + " Error: " + setLocalDescOp.Error.message);
 
         foreach (HandlerReceiveOptions options in optionsList)
         {
@@ -819,7 +770,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         RTCStatsReportAsyncOperation statsReport = await GetTransreceiverStats(transceiver);
         return statsReport.Value;
     }
-    public virtual async Task<RTCDataChannel> ReceiveDataChannel(HandlerReceiveDataChannelOptions options)
+    public virtual async Task<RTCDataChannel> ReceiveDataChannel(HandlerReceiveDataChannelOptions options,
+                                                        Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
     {
         var sctpStreamParameters = options.sctpStreamParameters;
         var label = options.label;
@@ -850,14 +802,15 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             if (!_transportReady)
             {
                 Sdp localSdpObject = answer.Desc.sdp.ToSdp();
-                SetupTransport(DtlsRole.client, localSdpObject);
+                _ = await SetupTransport(DtlsRole.client, localSdpObject, "recv", connectTransportCallback);
             }
             _ = await SetLocalDescriptionAsync(pc, answer.Desc);
             _hasDataChannelMediaSection = true;
         }
         return dataChannel;
     }
-    private async void SetupTransport(DtlsRole role, Sdp localSdpObject)
+
+    private async Task<bool> SetupTransport(DtlsRole role, Sdp localSdpObject, string transportType, Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
     {
         if (localSdpObject == null)
         {
@@ -870,7 +823,12 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         Action callBack = DefaultCallback;
         Action<Exception> errBack = ErrBack;
         _ = await SafeEmit("@connect", dtlsParameters, callBack, errBack);
+
+        bool transportReady = await connectTransportCallback(dtlsParameters, transportType);
+
         _transportReady = true;
+
+        return true;
     }
 
     public void DefaultCallback()
