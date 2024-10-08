@@ -128,14 +128,10 @@ public class RemoteSdp
                 sdpObject.Origin.AddrType = AddrType.Ip6;
             }
         }
-
-        Debug.Log($"Final Remote SDP object: {sdpObject.ToText()}");
-
     }
 
     public static byte[] HexadecimalStringToByteArray(String hexadecimalString)
     {
-        Debug.Log("Fingerprint hexadecimal string: " + hexadecimalString);
         int length = hexadecimalString.Length;
         byte[] byteArray = new byte[length / 2];
         for (int i = 0; i < length; i += 2)
@@ -189,8 +185,6 @@ public class RemoteSdp
     {
         AnswerMediaSection asnwerMediaSection = new AnswerMediaSection(iceParameters, iceCandidates, dtlsParameters, null, plainRtpParameters,
                                                     planB, _offerMediaObject, _offerRtp, _answerRtp, _codecOptions, _extmapAllowMixed);
-        Debug.Log(_resuedMid);
-        Debug.Log("RemoteSDP | Receive() | Answer media section: " + string.Join(" ", asnwerMediaSection._mediaObject.Fmts));
         if (!string.IsNullOrEmpty(_resuedMid))
         {
             ReplaceMediaSection(asnwerMediaSection, _resuedMid);

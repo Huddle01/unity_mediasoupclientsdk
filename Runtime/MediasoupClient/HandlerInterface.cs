@@ -139,8 +139,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             _forcedLocalDtlsRole = options.dtlsParameters.role == DtlsRole.server ? DtlsRole.client : DtlsRole.server;
         }
 
-        RTCConfiguration config = new RTCConfiguration
-        {
+        RTCConfiguration config = new RTCConfiguration { 
             bundlePolicy = RTCBundlePolicy.BundlePolicyMaxBundle,
             iceTransportPolicy = RTCIceTransportPolicy.All,
         };
@@ -270,7 +269,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         return statsOp.Value;
     }
 
-    public virtual async Task<HandlerSendResult> Send(HandlerSendOptions options, Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
+    public virtual async Task<HandlerSendResult> Send(HandlerSendOptions options, Func<DtlsParameters,string, Task<bool>> connectTransportCallback)
     {
         if (options.encodings != null && options.encodings.Count > 1)
         {
@@ -330,7 +329,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         if (!_transportReady)
         {
             DtlsRole localRole = _forcedLocalDtlsRole.HasValue ? _forcedLocalDtlsRole.Value : DtlsRole.client;
-            await SetupTransport(localRole, localSdp, "send", connectTransportCallback);
+           await SetupTransport(localRole, localSdp, "send",connectTransportCallback);
         }
 
         var localDescSetupOp = await SetLocalDescriptionAsync(pc, offer.Desc);
@@ -381,7 +380,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             sdp = remoteSdpFlat
         };
 
-        var remoteSdbSetupOp = await SetRemoteDescriptionAsync(pc, sessionDescription);
+        var remoteSdbSetupOp = await SetRemoteDescriptionAsync(pc, sessionDescription);        
         _mapMidTransceiver.Add(localId, transceiver);
 
         HandlerSendResult result = new HandlerSendResult
@@ -549,8 +548,8 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         RTCStatsReportAsyncOperation statsOp = await GetTransreceiverStats(transceiver);
         return statsOp.Value;
     }
-    public virtual async Task<HandlerSendDataChannelResult> SendDataChannel(HandlerSendDataChannelOptions options,
-                                                            Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
+    public virtual async Task<HandlerSendDataChannelResult> SendDataChannel(HandlerSendDataChannelOptions options, 
+                                                            Func<DtlsParameters,string, Task<bool>> connectTransportCallback)
     {
         RTCDataChannelInit channelInit = new RTCDataChannelInit
         {
@@ -572,7 +571,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
             MediaDescription offerMediaObject = localSdpObject.MediaDescriptions.FirstOrDefault(x => x.Media == MediaType.Application);
             if (!_transportReady)
             {
-                _ = await SetupTransport(DtlsRole.client, localSdpObject, "send", connectTransportCallback);
+                _ = await SetupTransport(DtlsRole.client, localSdpObject, "send",connectTransportCallback);
             }
             _ = await SetLocalDescriptionAsync(pc, offer.Desc);
             remoteSdp.SendSctpAssociation(offerMediaObject);
@@ -598,7 +597,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         };
     }
     public virtual async Task<List<HandlerReceiveResult>> Receive(List<HandlerReceiveOptions> optionsList,
-                                                            Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
+                                                            Func<DtlsParameters,string, Task<bool>> connectTransportCallback)
     {
         List<HandlerReceiveResult> results = new List<HandlerReceiveResult>();
         Dictionary<string, string> mapLocalId = new Dictionary<string, string>();
@@ -639,7 +638,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
 
         Sdp localSdpObject = answer.Desc.sdp.ToSdp();
 
-
+        
         foreach (HandlerReceiveOptions options in optionsList)
         {
             var trackId = options.trackId;
@@ -810,7 +809,7 @@ public class HandlerInterface : EnhancedEventEmitter<HandlerEvents>
         return dataChannel;
     }
 
-    private async Task<bool> SetupTransport(DtlsRole role, Sdp localSdpObject, string transportType, Func<DtlsParameters, string, Task<bool>> connectTransportCallback)
+    private async Task<bool> SetupTransport(DtlsRole role, Sdp localSdpObject,string transportType, Func<DtlsParameters,string, Task<bool>> connectTransportCallback)
     {
         if (localSdpObject == null)
         {

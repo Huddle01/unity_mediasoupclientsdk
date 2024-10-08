@@ -15,8 +15,6 @@ namespace Utilme.SdpTransform
         {
             Sdp sdp = new();
 
-            Debug.Log("Starting to parse str: " + str);
-
             var tokens = str.Split(new string[] { Sdp.CRLF }, StringSplitOptions.RemoveEmptyEntries);
             tokens = tokens.Select(t => t.Trim()).ToArray();
 
@@ -723,8 +721,6 @@ namespace Utilme.SdpTransform
                  .Replace(Sdp.AttributeIndicator, string.Empty)
                  .Replace(Group.Label, string.Empty)
                  .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-            Debug.Log($"Grop Value {tokens.Skip(1).ToArray().Length}");
 
             return new Group
             {

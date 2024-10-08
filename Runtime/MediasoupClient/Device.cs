@@ -133,8 +133,6 @@ namespace Mediasoup
             ORTC.ValidateIceParameters(iceParameters);
             ORTC.ValidateIceCandidates(iceCandidates);
 
-            UnityEngine.Debug.Log("Transport Constructor: " + JsonConvert.SerializeObject(extendedRtpCapabilities));
-
             return new Transport<AppData>("send", id, iceParameters, iceCandidates, dtlsParameters, sctpParameters, iceServers,
                 iceTransportPolicy, additionalSettings, proprietaryConstraints, appData, handler, extendedRtpCapabilities, canProduceByKind);
         }

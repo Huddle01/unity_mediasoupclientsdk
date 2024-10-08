@@ -33,6 +33,6 @@ namespace Mediasoup.RtpParameter
         /// VP9) are critical for codec matching.
         /// </summary>
         [JsonProperty("parameters")]
-        public IDictionary<string, object>? Parameters { get; set; }
+        public IDictionary<string, object> Parameters { get; set; }
     }
 }

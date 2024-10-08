@@ -210,14 +210,12 @@ namespace Mediasoup.Ortc
                 throw new ArgumentNullException($"{nameof(parameters)}.Codecs");
             }
 
-            UnityEngine.Debug.Log("Before Codec Validation: " + JsonConvert.SerializeObject(parameters));
 
             foreach (var codec in parameters.Codecs)
             {
                 ValidateRtpCodecParameters(codec);
             }
 
-            UnityEngine.Debug.Log("After Codec Validation: " + JsonConvert.SerializeObject(parameters));
 
             // headerExtensions is optional. If unset, fill with an empty array.
             parameters.HeaderExtensions ??= new List<RtpHeaderExtensionParameters>();
@@ -1514,9 +1512,6 @@ namespace Mediasoup.Ortc
 
         public static List<RtpCodecParameters> ReduceCodecs(List<RtpCodecParameters> codecs, RtpCodecCapability capCodec = null)
         {
-
-            UnityEngine.Debug.Log($"ORTC: CapCodec: {JsonConvert.SerializeObject(capCodec)}");
-
             List<RtpCodecParameters> filteredCodecs = new List<RtpCodecParameters>();
 
             if (capCodec == null || capCodec.MimeType == null)

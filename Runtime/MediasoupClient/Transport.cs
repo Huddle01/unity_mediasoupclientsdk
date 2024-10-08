@@ -56,14 +56,16 @@ namespace Mediasoup.Transports
         Task UpdateIceServers(List<RTCIceServer> iceServers);
 
         Task ProduceAsync(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
-                                    Func<DtlsParameters, string, Task<bool>> connectTransport,
+                                    Func<DtlsParameters,string,Task<bool>> connectTransport,
                                     Action<Producer<AppData>> producerCallback, ProducerOptions<AppData> options = null);
 
         void ConsumeAsync<ConsumerAppData>(
-        ConsumerOptions options = null, Action<Consumer<AppData>> resultCallback = null) where ConsumerAppData : AppData, new();
+        ConsumerOptions options = null,
+        Func<DtlsParameters, string, Task<bool>> connectTransport = null,
+        Action<Consumer<AppData>> resultCallback = null) where ConsumerAppData : AppData, new();
 
-        Task ProduceDataAsync(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback,
-                    Action<DataProducer<AppData>> dataProducerCallback, DataProducerOptions options = null);
+        Task ProduceDataAsync(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback, 
+                    Action<DataProducer<AppData>> dataProducerCallback,DataProducerOptions options = null);
 
         Task ConsumeDataAsync(Action<DataConsumer<AppData>> dataConsumerCallback,
         DataConsumerOptions options = null);
@@ -236,7 +238,7 @@ namespace Mediasoup.Transports
                 throw new ArgumentNullException("missing iceParameters");
             }
 
-            await awaitQueue.Push<bool>(AddRestartIceServersInQueue, null, iceParameters);
+            await awaitQueue.Push<bool>(AddRestartIceServersInQueue,null,iceParameters);
         }
 
         private async Task<bool> AddRestartIceServersInQueue(params object[] args)
@@ -262,11 +264,11 @@ namespace Mediasoup.Transports
                 throw new ArgumentNullException("missing iceParameters");
             }
 
-            await awaitQueue.Push<bool>(AddUpdateIceServersInQueue, null, iceServers);
+            await awaitQueue.Push<bool>(AddUpdateIceServersInQueue,null,iceServers);
 
         }
 
-        private async Task<bool> AddUpdateIceServersInQueue(params object[] args)
+        private async Task<bool> AddUpdateIceServersInQueue(params object[] args) 
         {
             List<RTCIceServer> iceServers = args[0] as List<RTCIceServer>;
             await handlerInterface.UpdateIceServers(iceServers);
@@ -282,8 +284,8 @@ namespace Mediasoup.Transports
         /// <param name="options"></param>
         /// <returns></returns>
         public async Task ProduceAsync(Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback,
-                                       Func<DtlsParameters, string, Task<bool>> coonectTransport,
-                                    Action<Producer<AppData>> producerCallback, ProducerOptions<AppData> options = null)
+                                       Func<DtlsParameters,string,Task<bool>> coonectTransport,
+                                    Action<Producer<AppData>> producerCallback,ProducerOptions<AppData> options = null)
         {
             if (isClosed)
             {
@@ -366,16 +368,16 @@ namespace Mediasoup.Transports
             };
 
             await awaitQueue.Push<Producer<AppData>>(AddProducerAsyncInQueue, producerCallback, GetProducerIdCallback,
-                                                        coonectTransport, options, handlerSendOptions);
+                                                        coonectTransport,options, handlerSendOptions);
 
         }
 
-        private async Task<Producer<AppData>> AddProducerAsyncInQueue(params object[] args)
+        private async Task<Producer<AppData>> AddProducerAsyncInQueue(params object[] args) 
         {
             Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>> GetProducerIdCallback = args[0] as Func<Unity.WebRTC.TrackKind, RtpParameters, AppData, Task<string>>;
             ProducerOptions<AppData> options = args[2] as ProducerOptions<AppData>;
             HandlerSendOptions handlerSendOptions = args[3] as HandlerSendOptions;
-            Func<DtlsParameters, string, Task<bool>> connectTransport = args[1] as Func<DtlsParameters, string, Task<bool>>;
+            Func<DtlsParameters,string, Task<bool>> connectTransport = args[1] as Func<DtlsParameters, string, Task<bool>>;
 
             HandlerSendResult handlerSendResult = await handlerInterface.Send(handlerSendOptions, connectTransport);
             Debug.Log($"Send transport connected");
@@ -409,7 +411,9 @@ namespace Mediasoup.Transports
         /// <typeparam name="ConsumerAppData"></typeparam>
         /// <param name="options"></param>
         /// <param name="resultCallback"></param>
-        public async void ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null, Action<Consumer<AppData>> resultCallback = null)
+        public async void ConsumeAsync<ConsumerAppData>(ConsumerOptions options = null,
+                                                        Func<DtlsParameters, string, Task<bool>> connectTransport =null,
+                                                        Action<Consumer<AppData>> resultCallback = null)
                 where ConsumerAppData : AppData, new()
         {
             if (isClosed)
@@ -462,7 +466,7 @@ namespace Mediasoup.Transports
 
             if (!consumerCreationInProgress)
             {
-                Task.Run(() => CreatePendingConsumer(resultCallback));
+                _ = Task.Run(() => CreatePendingConsumer(connectTransport,resultCallback));
             }
 
         }
@@ -475,7 +479,7 @@ namespace Mediasoup.Transports
         /// <param name="options">DataProducerOptions</param>
         /// <returns></returns>
         public async Task ProduceDataAsync(Func<SctpStreamParameters, string, string, AppData, Task<int>> GetProducerIdCallback,
-                               Action<DataProducer<AppData>> dataProducerCallback, DataProducerOptions options = null)
+                               Action<DataProducer<AppData>> dataProducerCallback,DataProducerOptions options = null)
         {
             if (isClosed)
             {
@@ -508,7 +512,7 @@ namespace Mediasoup.Transports
                 options.ordered = false;
             }
 
-            await awaitQueue.Push<DataProducer<AppData>>(AddDataProducerAsyncInQueue, dataProducerCallback, GetProducerIdCallback, options);
+            await awaitQueue.Push<DataProducer<AppData>>(AddDataProducerAsyncInQueue, dataProducerCallback, GetProducerIdCallback,options);
         }
 
 
@@ -525,7 +529,7 @@ namespace Mediasoup.Transports
                 protocol = options.protocol
             };
 
-            HandlerSendDataChannelResult sendDataResult = await handlerInterface.SendDataChannel(sendDataOption, null);
+            HandlerSendDataChannelResult sendDataResult = await handlerInterface.SendDataChannel(sendDataOption,null);
 
             ORTC.ValidateSctpStreamParameters(sendDataResult.sctpStreamParameters);
 
@@ -605,10 +609,10 @@ namespace Mediasoup.Transports
                 sctpStreamParameters = options.sctpStreamParameters
             };
 
-            RTCDataChannel sendDataResult = await handlerInterface.ReceiveDataChannel(sendDataoption, null);
+            RTCDataChannel sendDataResult = await handlerInterface.ReceiveDataChannel(sendDataoption,null);
 
 
-            DataConsumer<AppData> dataConsumer = new DataConsumer<AppData>(options.id, options.datProducerId,
+            DataConsumer<AppData>  dataConsumer = new DataConsumer<AppData>(options.id, options.datProducerId,
                                                     sendDataResult, options.sctpStreamParameters, options.dataConsumerAppData);
 
             dataConsumers.Add(dataConsumer.id, dataConsumer);
@@ -617,17 +621,19 @@ namespace Mediasoup.Transports
             return dataConsumer;
         }
 
-        public async Task CreatePendingConsumer(Action<Consumer<AppData>> resultCallback)
+        public async Task CreatePendingConsumer(Func<DtlsParameters, string, Task<bool>> connectTransport,
+            Action<Consumer<AppData>> resultCallback)
         {
             Debug.Log("CreatePendingConsumer() | Starting creating pending consumer");
             consumerCreationInProgress = true;
 
-            await awaitQueue.Push<bool>(AddCreatePendingConsumerToQueue, null, resultCallback);
+            await awaitQueue.Push<bool>(AddCreatePendingConsumerToQueue, null, connectTransport, resultCallback);
         }
 
-        private async Task<bool> AddCreatePendingConsumerToQueue(params object[] args)
+        private async Task<bool> AddCreatePendingConsumerToQueue(params object[] args) 
         {
-            Action<Consumer<AppData>> resultCallback = args[0] as Action<Consumer<AppData>>;
+            Action<Consumer<AppData>> resultCallback = args[1] as Action<Consumer<AppData>>;
+            Func<DtlsParameters, string, Task<bool>> connectTransport = args[0] as Func<DtlsParameters, string, Task<bool>>;
             if (pendingConsumerTasks.Count == 0)
             {
                 Debug.LogError("createPendingConsumers() | there is no Consumer to be created");
@@ -657,7 +663,7 @@ namespace Mediasoup.Transports
 
             try
             {
-                List<HandlerReceiveResult> results = await handlerInterface.Receive(optionsList, null);
+                List<HandlerReceiveResult> results = await handlerInterface.Receive(optionsList, connectTransport);
 
                 Debug.Log("CreatePendingConsumer() | resultSize: " + results.Count);
 
@@ -718,7 +724,7 @@ namespace Mediasoup.Transports
                             kind = "video",
                             rtpParameters = probatorRtpParameters
                         }
-                    }, null);
+                    },null);
 
                     _probatorConsumerCreated = true;
                 }
@@ -731,7 +737,7 @@ namespace Mediasoup.Transports
             consumerCreationInProgress = false;
             if (pendingConsumerTasks.Count > 0)
             {
-                CreatePendingConsumer(resultCallback);
+                CreatePendingConsumer(connectTransport,resultCallback);
             }
 
             return true;
@@ -742,11 +748,11 @@ namespace Mediasoup.Transports
         {
             consumerPauseInProgress = true;
 
-            await awaitQueue.Push<bool>(AddPausePendingConsumersToQueue, null);
+            await awaitQueue.Push<bool>(AddPausePendingConsumersToQueue,null);
 
         }
 
-        private async Task<bool> AddPausePendingConsumersToQueue(params object[] args)
+        private async Task<bool> AddPausePendingConsumersToQueue(params object[] args) 
         {
             if (pendingPauseConsumers.Count == 0)
             {
@@ -783,12 +789,12 @@ namespace Mediasoup.Transports
         {
             consumerResumeInProgress = true;
 
-            await awaitQueue.Push<bool>(AddResumePendingConsumersToQueue, null);
+            await awaitQueue.Push<bool>(AddResumePendingConsumersToQueue,null);
         }
 
-        private async Task<bool> AddResumePendingConsumersToQueue(params object[] args)
+        private async Task<bool> AddResumePendingConsumersToQueue(params object[] args) 
         {
-            try
+            try 
             {
                 if (pendingResumeConsumers.Count == 0)
                 {
@@ -829,9 +835,9 @@ namespace Mediasoup.Transports
             await awaitQueue.Push<bool>(AddClosePendingConsumersToQueue, null);
         }
 
-        private async Task<bool> AddClosePendingConsumersToQueue(params object[] args)
+        private async Task<bool> AddClosePendingConsumersToQueue(params object[] args) 
         {
-            try
+            try 
             {
                 if (pendingCloseConsumers.Count == 0)
                 {
@@ -900,7 +906,7 @@ namespace Mediasoup.Transports
 
                 iceGatheringState = _iceGatheringState;
 
-                Debug.Log("Is Transport Closed: " + isClosed);
+                Debug.Log("Is Transport Closed: " + isClosed );
 
                 if (!isClosed)
                 {
@@ -985,20 +991,20 @@ namespace Mediasoup.Transports
             });
 
             _producer.On("@getstats", async (args) =>
-            {
-                Action callbackAction = args[0] as Action;
+             {
+                 Action callbackAction = args[0] as Action;
 
-                if (isClosed)
-                {
-                    return;
-                }
+                 if (isClosed)
+                 {
+                     return;
+                 }
 
-                await handlerInterface.GetSenderStats(_producer.localId).
-                ContinueWith((prevTask) => callbackAction.Invoke());
-            });
+                 await handlerInterface.GetSenderStats(_producer.localId).
+                 ContinueWith((prevTask) => callbackAction.Invoke());
+             });
         }
 
-        private async Task<bool> AddSetSendingToQueue(params object[] args)
+        private async Task<bool> AddSetSendingToQueue(params object[] args) 
         {
             Producer<AppData> producer = args[0] as Producer<AppData>;
             handlerInterface.StopSending(producer.id);
@@ -1070,14 +1076,14 @@ namespace Mediasoup.Transports
                 consumers.Remove(_consumer.id);
                 pendingPauseConsumers.Remove(_consumer.id);
                 pendingResumeConsumers.Remove(_consumer.id);
-                if (isClosed)
+                if (isClosed) 
                 {
                     return;
                 }
 
-                pendingCloseConsumers.Add(_consumer.id, _consumer);
+                pendingCloseConsumers.Add(_consumer.id,_consumer);
 
-                if (!consumerCloseInProgress)
+                if (!consumerCloseInProgress) 
                 {
                     ClosePendingConsumers();
                 }
@@ -1086,12 +1092,12 @@ namespace Mediasoup.Transports
 
             _consumer.On("@pause", async _ =>
             {
-                if (pendingResumeConsumers.TryGetValue(_consumer.id, out IConsumer tempcon))
+                if (pendingResumeConsumers.TryGetValue(_consumer.id, out IConsumer tempcon)) 
                 {
                     pendingResumeConsumers.Remove(_consumer.id);
                 }
 
-                pendingPauseConsumers.Add(_consumer.id, _consumer);
+                pendingPauseConsumers.Add(_consumer.id,_consumer);
 
                 await Task.Run(() =>
                 {
