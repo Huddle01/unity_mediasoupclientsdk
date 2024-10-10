@@ -940,7 +940,7 @@ namespace Mediasoup.Transports
         {
             _producer.On("@close", async _ =>
             {
-                producers.Remove(_producer.id);
+                producers.Remove(_producer.localId);
 
                 if (isClosed) return;
 
@@ -1007,7 +1007,7 @@ namespace Mediasoup.Transports
         private async Task<bool> AddSetSendingToQueue(params object[] args) 
         {
             Producer<AppData> producer = args[0] as Producer<AppData>;
-            handlerInterface.StopSending(producer.id);
+            handlerInterface.StopSending(producer.localId);
             return true;
         }
 
