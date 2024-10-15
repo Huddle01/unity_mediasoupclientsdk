@@ -686,8 +686,9 @@ namespace Mediasoup.Transports
 
                     Consumer<AppData> tempConsumer = new Consumer<AppData>(tempId, tempLocalId, tempProducerId,
                                                         tempRtpReceiver, tempTrack, tempRtpParam, tempAppData);
+                    Debug.Log("Consumer created");
 
-                    consumers.Add(tempConsumer.id, tempConsumer);
+                    consumers[tempConsumer.id]= tempConsumer;
                     HandleConsumer(tempConsumer);
 
                     if (!_probatorConsumerCreated && videoConsumerForProbator == null && tempkind == "video")
@@ -698,9 +699,9 @@ namespace Mediasoup.Transports
                     _ = observer.SafeEmit("newconsumer", tempConsumer);
 
                     task.ResolveConsumer(tempConsumer);
+                    Debug.Log("Call result callback");
                     resultCallback.Invoke(tempConsumer);
                 }
-
             }
             catch (Exception ex)
             {

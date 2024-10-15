@@ -987,7 +987,7 @@ namespace Utilme.SdpTransform
         {
             var tokens = str
                 .Replace(Sdp.AttributeIndicator, string.Empty)
-                .Replace(Ssrc.Label, string.Empty)
+                .Replace(Ssrc.Label, string.Empty).Replace("msid:- ", "msid:-")
                 .Split(new char[] { ' ', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             var attributeAndValue = tokens[1].Split(':');
             return new Ssrc
@@ -998,10 +998,13 @@ namespace Utilme.SdpTransform
             };
         }
 
-        public static string ToText(this Ssrc ssrc) =>
-            $"{Sdp.AttributeIndicator}{Ssrc.Label}" +
+        public static string ToText(this Ssrc ssrc) 
+        {
+            return $"{Sdp.AttributeIndicator}{Ssrc.Label}" +
                 $"{ssrc.Id} {ssrc.Attribute}{(ssrc.Value == null ? string.Empty : ":" + ssrc.Value)}" +
                 $"{Sdp.CRLF}";
+        }
+            
 
         public static SsrcGroup ToSsrcGroup(this string str)
         {

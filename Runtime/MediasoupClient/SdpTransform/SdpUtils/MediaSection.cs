@@ -819,6 +819,8 @@ public class OfferMediaSection : MediaSection
                 _mediaObject.Attributes.RtcpMux = true;
                 _mediaObject.Attributes.RtcpRsize = true;
 
+                Debug.Log($"OfferRtp : {JsonConvert.SerializeObject(_offerRtp)}");
+
                 if (_offerRtp != null && _offerRtp.Encodings != null && _offerRtp.Encodings.Count > 0)
                 {
                     RtpEncodingParameters encoding = _offerRtp.Encodings[0];
@@ -854,7 +856,7 @@ public class OfferMediaSection : MediaSection
                         });
                     }
 
-                    if (rtsxSSrc != uint.MaxValue)
+               /*     if (rtsxSSrc != uint.MaxValue)
                     {
                         if (_offerRtp.Rtcp != null && !string.IsNullOrEmpty(_offerRtp.Rtcp.CNAME))
                         {
@@ -884,7 +886,7 @@ public class OfferMediaSection : MediaSection
                             SsrcIds = new string[] { ssrc.ToString(), rtsxSSrc.ToString() },
                         });
 
-                    }
+                    }*/
 
                 }
 

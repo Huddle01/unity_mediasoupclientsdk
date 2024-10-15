@@ -277,46 +277,61 @@ public class CommonUtils
 
             fmtp = answerMediaObject.Attributes.Fmtps.FirstOrDefault<Fmtp>(f => f.PayloadType == codec.PayloadType);
 
-            answerMediaObject.Attributes.Fmtps.Add(fmtp);
-
-            Dictionary<string, object> fmtpParameters = new Dictionary<string, object>();
-
-            string[] configPayload = fmtp.Value.Split(" ");
-            string[] paramList = configPayload[1].Split(';');
-
-            foreach (string pair in paramList)
+            if (fmtp == null)
             {
-                var keyValue = pair.Split('=');
-
-                if (keyValue.Length == 2)
-                {
-                    // Add to the dictionary
-                    fmtpParameters.Add(keyValue[0].Trim(), keyValue[1].Trim());
-                }
+                fmtp = new Fmtp { PayloadType = codec.PayloadType,Value = ""};
+                answerMediaObject.Attributes.Fmtps.Add(fmtp);
             }
+
+            Dictionary<string, string> fmtpParameters = ParseParams(fmtp.Value);
 
             switch (mimeType)
             {
                 case "audio/opus":
 
-                    object spropStereo = codec.Parameters["sprop-stereo"];
-
-                    if (spropStereo != null)
+                    if (codec.Parameters.TryGetValue("sprop-stereo",out object val)) 
                     {
-                        fmtpParameters["stereo"] = spropStereo;
+                        string spropStereo = val as string;
+
+                        if (spropStereo != null)
+                        {
+                            fmtpParameters["stereo"] = spropStereo;
+                        }
                     }
+
                     break;
-
             }
 
-            string fmtpConfig = configPayload[0] + " ";
+            string fmtpConfig = "";
 
-            foreach (var par in fmtpParameters)
+            foreach (var key in fmtpParameters.Keys)
             {
-                fmtpConfig += par.Key + "=" + par.Value + ";";
+                if (!string.IsNullOrEmpty(fmtpConfig))
+                {
+                    fmtpConfig += ";";
+                }
+
+                fmtpConfig += $"{key}={fmtpParameters[key]}";
             }
 
-            fmtp.Value = fmtpConfig;
         }
     }
+
+    private static Dictionary<string, string> ParseParams(string str)
+    {
+        return str
+            .Split(new[] { "; " }, StringSplitOptions.RemoveEmptyEntries)
+            .Aggregate(new Dictionary<string, string>(), ParamReducer);
+    }
+
+    private static Dictionary<string, string> ParamReducer(Dictionary<string, string> acc, string param)
+    {
+        var parts = param.Split('=');
+        if (parts.Length == 2)
+        {
+            acc[parts[0].Trim()] = parts[1].Trim();
+        }
+        return acc;
+    }
+
 }
