@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Mediasoup.RtpParameter;
 using Mediasoup.SctpParameter;
 using Mediasoup.Transports;
-using Unity.WebRTC;
-using Utilme.SdpTransform;
-using UnityEngine;
 using Newtonsoft.Json;
+using UnityEngine;
 
 namespace Mediasoup.Ortc
 {
@@ -1310,14 +1307,14 @@ namespace Mediasoup.Ortc
 
                 rtpParameters.Codecs.Add(codec);
 
-                if (extendedCodec.remoteRtxPayloadType.HasValue)
+                if (extendedCodec.localRtxPayloadType.HasValue)
                 {
                     RtpCodecParameters rtxCodec = new RtpCodecParameters
                     {
                         MimeType = $"{extendedCodec.kind}/rtx",
-                        PayloadType = extendedCodec.remoteRtxPayloadType.Value,
+                        PayloadType = extendedCodec.localRtxPayloadType.Value,
                         ClockRate = extendedCodec.clockRate,
-                        Parameters = new Dictionary<string, object> { { "apt", extendedCodec.remotePayloadType } },
+                        Parameters = new Dictionary<string, object> { { "apt", extendedCodec.localPayloadType } },
                         RtcpFeedback = new List<RtcpFeedback>()
                     };
 
@@ -1630,7 +1627,7 @@ namespace Mediasoup.Ortc
 
 
                     RtpCodecCapability matchingRemoteRtxCodec = remoteCaps.Codecs.FirstOrDefault(codec => IsRtxCodec(codec)
-                    && ExtractApt(codec.Parameters["apt"]) == extendedCodec.localPayloadType);
+                    && ExtractApt(codec.Parameters["apt"]) == extendedCodec.remotePayloadType);
 
                     if (matchingLocalRtxCodec != null && matchingRemoteRtxCodec != null)
                     {
