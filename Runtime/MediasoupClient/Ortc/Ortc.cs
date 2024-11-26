@@ -1,4 +1,7 @@
-﻿using System;
+﻿#if !UNITY_WEBGL
+
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
@@ -1806,3 +1809,6 @@ namespace Mediasoup.Ortc
         }
     }
 }
+
+#endif
+

@@ -1,3 +1,4 @@
+#if !UNITY_WEBGL
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -182,3 +183,7 @@ namespace Mediasoup.DataProducers
         public List<Action> Close { get; set; } = new List<Action>();
     }
 }
+#endif
+
+
+

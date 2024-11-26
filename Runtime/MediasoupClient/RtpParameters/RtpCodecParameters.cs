@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
@@ -85,3 +87,6 @@ namespace Mediasoup.RtpParameter
         }
     }
 }
+
+#endif
+

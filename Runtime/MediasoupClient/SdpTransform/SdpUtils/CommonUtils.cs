@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using Mediasoup.RtpParameter;
 using System.Collections.Generic;
 using Utilme.SdpTransform;
@@ -335,3 +337,7 @@ public class CommonUtils
     }
 
 }
+
+#endif
+
+

@@ -1,3 +1,4 @@
+#if !UNITY_WEBGL
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -145,5 +146,8 @@ namespace Huddle01.Utils
         public bool ShouldRemove = false;
     }
 }
+#endif
+
+
 
 

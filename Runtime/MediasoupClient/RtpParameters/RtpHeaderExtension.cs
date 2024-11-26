@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using Newtonsoft.Json;
 using System;
 
@@ -55,3 +57,7 @@ namespace Mediasoup.RtpParameter
         public RtpHeaderExtensionDirection? Direction { get; set; }
     }
 }
+
+#endif
+
+

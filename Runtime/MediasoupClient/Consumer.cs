@@ -1,3 +1,4 @@
+#if !UNITY_WEBGL
 using System.Collections.Generic;
 using Mediasoup.RtpParameter;
 using Mediasoup.Internal;
@@ -7,6 +8,7 @@ using Mediasoup.Types;
 
 namespace Mediasoup
 {
+
     public interface IConsumer
     {
         string id { get; set; }
@@ -174,3 +176,6 @@ namespace Mediasoup
     }
 
 }
+#endif
+
+

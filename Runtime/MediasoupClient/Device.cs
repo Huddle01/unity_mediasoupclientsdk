@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using Newtonsoft.Json;
 using Unity.WebRTC;
 using Mediasoup.RtpParameter;
@@ -172,5 +174,7 @@ namespace Mediasoup
         }
     }
 }
+#endif
+
 
 

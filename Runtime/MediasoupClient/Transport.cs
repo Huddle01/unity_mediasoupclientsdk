@@ -1,3 +1,4 @@
+#if !UNITY_WEBGL
 using System.Collections.Generic;
 using System;
 using System.Linq;
@@ -1315,3 +1316,6 @@ namespace Mediasoup.Transports
     }
 
 }
+#endif
+
+

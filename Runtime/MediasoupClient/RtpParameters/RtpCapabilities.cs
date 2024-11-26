@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using System;
 using System.Collections.Generic;
 using Mediasoup.RtpParameter;
@@ -503,3 +505,6 @@ namespace Mediasoup.RtpParameter
         }
     }
 }
+
+#endif
+

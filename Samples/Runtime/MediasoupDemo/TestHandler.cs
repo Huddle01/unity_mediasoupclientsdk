@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using Mediasoup.RtpParameter;
 using System.Collections;
 using System.Collections.Generic;
@@ -33,3 +35,6 @@ public class TestHandler : MonoBehaviour
         Console.WriteLine("Update");
     }
 }
+#endif
+
+

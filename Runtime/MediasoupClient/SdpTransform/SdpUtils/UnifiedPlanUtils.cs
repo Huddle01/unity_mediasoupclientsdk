@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -190,3 +192,7 @@ public class UnifiedPlanUtils
     }
 
 }
+
+#endif
+
+

@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System.Runtime.Serialization;
@@ -97,3 +99,7 @@ namespace Mediasoup.RtpParameter
 
     }
 }
+
+#endif
+
+

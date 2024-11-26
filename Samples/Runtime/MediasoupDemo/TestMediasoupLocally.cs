@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using Mediasoup;
 using Mediasoup.Transports;
 using Mediasoup.Types;
@@ -461,3 +463,7 @@ public class TestMediasoupLocally : MonoBehaviour
     }
 
 }
+
+#endif
+
+

@@ -1,3 +1,5 @@
+#if !UNITY_WEBGL
+
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -48,3 +50,7 @@ namespace Mediasoup.RtpParameter
         public List<RtcpFeedback> RtcpFeedback { get; set; }
     }
 }
+
+
+#endif
+
